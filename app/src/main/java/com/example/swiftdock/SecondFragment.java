@@ -344,8 +344,8 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             
             android.widget.FrameLayout.LayoutParams iconLp = (android.widget.FrameLayout.LayoutParams) holder.ivIcon.getLayoutParams();
             if (isPerfBtn) {
-                iconLp.width = dpToPx(26);
-                iconLp.height = dpToPx(26);
+                iconLp.width = dpToPx(34);
+                iconLp.height = dpToPx(34);
                 iconLp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
                 iconLp.topMargin = dpToPx(6);
                 iconLp.leftMargin = dpToPx(6);
@@ -382,8 +382,8 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                 holder.tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, textSize);
                 holder.tvTitle.setText(displayTxt);
             } else {
-                iconLp.width = dpToPx(38);
-                iconLp.height = dpToPx(38);
+                iconLp.width = dpToPx(48);
+                iconLp.height = dpToPx(48);
                 iconLp.gravity = android.view.Gravity.CENTER;
                 iconLp.topMargin = 0;
                 iconLp.leftMargin = 0;
@@ -454,7 +454,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             root.setTag("dynamic_url_grid");
             root.setOrientation(android.widget.LinearLayout.VERTICAL);
             android.widget.FrameLayout.LayoutParams rootLp = new android.widget.FrameLayout.LayoutParams(
-                    dpToPx(44), dpToPx(44), android.view.Gravity.CENTER
+                    dpToPx(54), dpToPx(54), android.view.Gravity.CENTER
             );
             root.setLayoutParams(rootLp);
             root.setGravity(android.view.Gravity.CENTER);
@@ -595,6 +595,14 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                     return R.drawable.ic_bluetooth;
                 case "bluetooth_off":
                     return R.drawable.ic_bluetooth_off;
+                case "screen_record":
+                    return R.drawable.ic_screen_record;
+                case "screenshot":
+                    return R.drawable.ic_camera;
+                case "home_screen":
+                    return R.drawable.ic_home;
+                case "close_all_apps":
+                    return R.drawable.ic_close;
                 default:
                     return R.drawable.ic_default;
             }
