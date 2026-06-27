@@ -43,6 +43,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
 
     private boolean isUserDisconnecting = false;
     private boolean isReconnecting = false;
+    private boolean isHoldingButton = false;
     private final Handler reconnectHandler = new Handler(Looper.getMainLooper());
     private final Runnable reconnectRunnable = new Runnable() {
         @Override
@@ -268,6 +269,10 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
     @Override
     public void onPerformanceUpdated(int cpu, int gpu, int ram, int temp, String wifi) {
         if (!isAdded()) return;
+        if (isHoldingButton) {
+            // Do not refresh layout when holding a button to prevent touch event disruption
+            return;
+        }
         if (pagerAdapter != null) {
             pagerAdapter.notifyDataSetChanged();
         }
@@ -510,6 +515,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                         }
                         switch (event.getAction()) {
                             case android.view.MotionEvent.ACTION_DOWN:
+                                isHoldingButton = true;
                                 if (networkClient.isConnected()) {
                                     networkClient.sendButtonPress(btn.getId());
                                 }
@@ -522,21 +528,12 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                                 return true;
 
                             case android.view.MotionEvent.ACTION_MOVE:
-                                // Cancel repeating if the touch moves too far outside the bounds of the button (100px buffer slop)
-                                float x = event.getX();
-                                float y = event.getY();
-                                float slop = 100f;
-                                if (x < -slop || x > v.getWidth() + slop || y < -slop || y > v.getHeight() + slop) {
-                                    repeatHandler.removeCallbacks(repeatRunnable);
-                                    v.setPressed(false);
-                                    if (finalCardView != null) {
-                                        finalCardView.setPressed(false);
-                                    }
-                                }
+                                // Consuming ACTION_MOVE keeps the touch session active and ignores finger drifts
                                 return true;
 
                             case android.view.MotionEvent.ACTION_UP:
                             case android.view.MotionEvent.ACTION_CANCEL:
+                                isHoldingButton = false;
                                 repeatHandler.removeCallbacks(repeatRunnable);
                                 v.setPressed(false);
                                 if (finalCardView != null) {
