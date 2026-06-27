@@ -505,6 +505,9 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
 
                     @Override
                     public boolean onTouch(View v, android.view.MotionEvent event) {
+                        if (v.getParent() != null) {
+                            v.getParent().requestDisallowInterceptTouchEvent(true);
+                        }
                         switch (event.getAction()) {
                             case android.view.MotionEvent.ACTION_DOWN:
                                 if (networkClient.isConnected()) {
@@ -519,10 +522,11 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                                 return true;
 
                             case android.view.MotionEvent.ACTION_MOVE:
-                                // Cancel repeating if the touch moves outside the bounds of the button
+                                // Cancel repeating if the touch moves too far outside the bounds of the button (100px buffer slop)
                                 float x = event.getX();
                                 float y = event.getY();
-                                if (x < 0 || x > v.getWidth() || y < 0 || y > v.getHeight()) {
+                                float slop = 100f;
+                                if (x < -slop || x > v.getWidth() + slop || y < -slop || y > v.getHeight() + slop) {
                                     repeatHandler.removeCallbacks(repeatRunnable);
                                     v.setPressed(false);
                                     if (finalCardView != null) {
