@@ -352,6 +352,7 @@ public class NetworkClient {
                 
                 tcpSocket = new Socket();
                 tcpSocket.connect(new InetSocketAddress(ip, discoveredPort), 4000);
+                tcpSocket.setSoTimeout(7000);
                 outputStream = tcpSocket.getOutputStream();
 
                 // Send AUTH request
@@ -404,6 +405,7 @@ public class NetworkClient {
 
                 tcpSocket = new Socket();
                 tcpSocket.connect(new InetSocketAddress(ip, discoveredPort), 3000);
+                tcpSocket.setSoTimeout(7000);
                 outputStream = tcpSocket.getOutputStream();
 
                 // Send RECONNECT request
@@ -479,6 +481,18 @@ public class NetworkClient {
         } else {
             throw new Exception("Output stream is null. Socket not connected.");
         }
+    }
+
+    private void sendHeartbeatAck() {
+        new Thread(() -> {
+            try {
+                JSONObject ack = new JSONObject();
+                ack.put("type", "HEARTBEAT_ACK");
+                sendRaw(ack.toString());
+            } catch (Exception e) {
+                Log.e(TAG, "Error sending HEARTBEAT_ACK: " + e.getMessage());
+            }
+        }).start();
     }
 
     private void closeTcpConnection() {
@@ -575,6 +589,8 @@ public class NetworkClient {
                 cachedProfiles = profiles;
                 currentProfileId = activeProfileId;
                 notifyProfilesSynced(profiles, activeProfileId);
+            } else if ("HEARTBEAT".equalsIgnoreCase(type)) {
+                sendHeartbeatAck();
             }
         } catch (Exception e) {
             Log.e(TAG, "Error parsing incoming packet: " + e.getMessage());

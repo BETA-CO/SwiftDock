@@ -21,6 +21,11 @@ import androidx.fragment.app.Fragment;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
+import androidx.constraintlayout.widget.ConstraintLayout;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Handler;
+import android.os.Looper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,10 +35,31 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
     private ViewPager2 viewPager;
     private LinearLayout layoutDots;
     private TextView tvStatus;
+    private ConstraintLayout layoutReconnectingOverlay;
     
     private NetworkClient networkClient;
     private List<ShortcutButton> buttonsList = new ArrayList<>();
     private PagerAdapter pagerAdapter;
+
+    private boolean isUserDisconnecting = false;
+    private boolean isReconnecting = false;
+    private final Handler reconnectHandler = new Handler(Looper.getMainLooper());
+    private final Runnable reconnectRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isAdded() || isUserDisconnecting) return;
+            if (!networkClient.isConnected()) {
+                SharedPreferences prefs = requireContext().getSharedPreferences("SwiftDockPrefs", Context.MODE_PRIVATE);
+                String savedIp = prefs.getString("paired_ip", "");
+                String savedToken = prefs.getString("paired_token", "");
+                String mobileName = prefs.getString("mobile_name", android.os.Build.MODEL);
+
+                if (!android.text.TextUtils.isEmpty(savedIp) && !android.text.TextUtils.isEmpty(savedToken)) {
+                    networkClient.reconnect(savedIp, savedToken, mobileName);
+                }
+            }
+        }
+    };
 
     @Override
     public View onCreateView(
@@ -76,6 +102,22 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                 updateDots(position);
             }
         });
+
+        layoutReconnectingOverlay = view.findViewById(R.id.layout_reconnecting_overlay);
+        isUserDisconnecting = false;
+        isReconnecting = false;
+
+        View btnCancelReconnect = view.findViewById(R.id.btn_reconnect_cancel);
+        if (btnCancelReconnect != null) {
+            btnCancelReconnect.setOnClickListener(v -> {
+                isUserDisconnecting = true;
+                isReconnecting = false;
+                reconnectHandler.removeCallbacks(reconnectRunnable);
+                networkClient.disconnect();
+                clearPairingPrefs();
+                navigateToConnectScreen();
+            });
+        }
     }
 
     private void setButtonsList(List<ShortcutButton> buttons) {
@@ -161,16 +203,40 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
     public void onServerDiscovered(String ip, int port, String hostname) {}
 
     @Override
-    public void onConnectionSuccess(String token) {}
+    public void onConnectionSuccess(String token) {
+        if (!isAdded()) return;
+        if (isReconnecting) {
+            isReconnecting = false;
+            reconnectHandler.removeCallbacks(reconnectRunnable);
+            if (layoutReconnectingOverlay != null) {
+                layoutReconnectingOverlay.setVisibility(View.GONE);
+            }
+            Toast.makeText(getContext(), "Reconnected!", Toast.LENGTH_SHORT).show();
+        }
+    }
 
     @Override
-    public void onConnectionFailed(String reason) {}
+    public void onConnectionFailed(String reason) {
+        if (!isAdded()) return;
+        if (isReconnecting) {
+            reconnectHandler.removeCallbacks(reconnectRunnable);
+            reconnectHandler.postDelayed(reconnectRunnable, 3000);
+        }
+    }
 
     @Override
     public void onDisconnected() {
         if (!isAdded()) return;
-        Toast.makeText(getContext(), "Connection to PC lost.", Toast.LENGTH_SHORT).show();
-        navigateToConnectScreen();
+        if (isUserDisconnecting) {
+            navigateToConnectScreen();
+        } else {
+            isReconnecting = true;
+            if (layoutReconnectingOverlay != null) {
+                layoutReconnectingOverlay.setVisibility(View.VISIBLE);
+            }
+            reconnectHandler.removeCallbacks(reconnectRunnable);
+            reconnectHandler.post(reconnectRunnable);
+        }
     }
 
     @Override
@@ -798,6 +864,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             btnYes.setText("Disconnect");
             btnYes.setOnClickListener(v -> {
                 dialog.dismiss();
+                isUserDisconnecting = true;
                 networkClient.disconnect();
                 requireActivity().finishAffinity();
             });
@@ -835,6 +902,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             btnYes.setText("Unpair & Pair");
             btnYes.setOnClickListener(v -> {
                 dialog.dismiss();
+                isUserDisconnecting = true;
                 networkClient.disconnect();
                 clearPairingPrefs();
                 navigateToConnectScreen();
