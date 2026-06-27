@@ -518,6 +518,19 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                                 }
                                 return true;
 
+                            case android.view.MotionEvent.ACTION_MOVE:
+                                // Cancel repeating if the touch moves outside the bounds of the button
+                                float x = event.getX();
+                                float y = event.getY();
+                                if (x < 0 || x > v.getWidth() || y < 0 || y > v.getHeight()) {
+                                    repeatHandler.removeCallbacks(repeatRunnable);
+                                    v.setPressed(false);
+                                    if (finalCardView != null) {
+                                        finalCardView.setPressed(false);
+                                    }
+                                }
+                                return true;
+
                             case android.view.MotionEvent.ACTION_UP:
                             case android.view.MotionEvent.ACTION_CANCEL:
                                 repeatHandler.removeCallbacks(repeatRunnable);
