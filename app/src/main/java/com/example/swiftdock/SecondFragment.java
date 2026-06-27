@@ -489,6 +489,51 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                 renderSingleIcon(holder.ivIcon, iconValue);
             }
 
+            final View finalCardView = holder.cardView;
+            if (isActionRepeatable(btn)) {
+                convertView.setOnTouchListener(new View.OnTouchListener() {
+                    private final Handler repeatHandler = new Handler(Looper.getMainLooper());
+                    private final Runnable repeatRunnable = new Runnable() {
+                        @Override
+                        public void run() {
+                            if (networkClient.isConnected()) {
+                                networkClient.sendButtonPress(btn.getId());
+                                repeatHandler.postDelayed(this, 100);
+                            }
+                        }
+                    };
+
+                    @Override
+                    public boolean onTouch(View v, android.view.MotionEvent event) {
+                        switch (event.getAction()) {
+                            case android.view.MotionEvent.ACTION_DOWN:
+                                if (networkClient.isConnected()) {
+                                    networkClient.sendButtonPress(btn.getId());
+                                }
+                                repeatHandler.removeCallbacks(repeatRunnable);
+                                repeatHandler.postDelayed(repeatRunnable, 400);
+                                v.setPressed(true);
+                                if (finalCardView != null) {
+                                    finalCardView.setPressed(true);
+                                }
+                                return true;
+
+                            case android.view.MotionEvent.ACTION_UP:
+                            case android.view.MotionEvent.ACTION_CANCEL:
+                                repeatHandler.removeCallbacks(repeatRunnable);
+                                v.setPressed(false);
+                                if (finalCardView != null) {
+                                    finalCardView.setPressed(false);
+                                }
+                                return true;
+                        }
+                        return false;
+                    }
+                });
+            } else {
+                convertView.setOnTouchListener(null);
+            }
+
             return convertView;
         }
 
@@ -914,6 +959,20 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
         }
 
         dialog.show();
+    }
+
+    private boolean isActionRepeatable(ShortcutButton btn) {
+        if (btn == null) return false;
+        String type = btn.getActionType();
+        String data = btn.getActionData();
+        if ("System".equalsIgnoreCase(type) && data != null) {
+            String dataLower = data.toLowerCase();
+            return dataLower.equals("volume_up") ||
+                   dataLower.equals("volume_down") ||
+                   dataLower.equals("brightness_up") ||
+                   dataLower.equals("brightness_down");
+        }
+        return false;
     }
 
     private int dpToPx(int dp) {
