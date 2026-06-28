@@ -20,7 +20,10 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.fragment.NavHostFragment;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class FirstFragment extends Fragment implements NetworkClient.NetworkListener {
 
@@ -30,23 +33,21 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
     private static final String KEY_PAIRED_PC = "paired_pc";
     private static final String KEY_PAIRED_IP = "paired_ip";
 
-    private LinearLayout layoutStep1, layoutStep2, layoutStep3, layoutReconnecting, layoutReconnectOptions;
-    private EditText editMobileName;
-    private TextView tvDiscoveryStatus, tvReconnectStatus, tvReconnectSubtitle, tvReconnectOptionsSubtitle;
-    private TextView tvPinDigit1, tvPinDigit2, tvPinDigit3, tvPinDigit4;
-    private Button btnStep2Connect, btnRetryReconnect, btnConnectOld, btnPairNew, btnStep1Back;
+    private LinearLayout layoutReconnecting, layoutReconnectOptions;
+    private TextView tvReconnectStatus, tvReconnectSubtitle, tvReconnectOptionsSubtitle, tvReconnectOptionsTitle;
+    private Button btnRetryReconnect, btnConnectOld;
     private ProgressBar progressReconnect;
 
     private String discoveredIp;
+    private final Map<String, String> discoveredServers = new HashMap<>();
 
     private String savedToken;
     private String savedPcName;
     private String mobileName;
     private boolean isAttemptingAutoReconnect = false;
-    private boolean isFirstTimePairing = false;
+    private boolean isConnecting = false;
 
     private NetworkClient networkClient;
-    private final StringBuilder pinBuilder = new StringBuilder();
 
     @Override
     public View onCreateView(
@@ -64,32 +65,18 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
         requireActivity().setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
         // Bind layouts
-        layoutStep1 = view.findViewById(R.id.layout_step1);
-        layoutStep2 = view.findViewById(R.id.layout_step2);
-        layoutStep3 = view.findViewById(R.id.layout_step3);
         layoutReconnecting = view.findViewById(R.id.layout_reconnecting);
         layoutReconnectOptions = view.findViewById(R.id.layout_reconnect_options);
 
         // Bind inputs/buttons
-        editMobileName = view.findViewById(R.id.edit_mobile_name);
-        tvDiscoveryStatus = view.findViewById(R.id.tv_discovery_status);
         tvReconnectStatus = view.findViewById(R.id.tv_reconnect_status);
         tvReconnectSubtitle = view.findViewById(R.id.tv_reconnect_subtitle);
         tvReconnectOptionsSubtitle = view.findViewById(R.id.tv_reconnect_options_subtitle);
-        btnStep2Connect = view.findViewById(R.id.btn_step2_connect);
+        tvReconnectOptionsTitle = view.findViewById(R.id.tv_reconnect_options_title);
         btnRetryReconnect = view.findViewById(R.id.btn_retry_reconnect);
         btnConnectOld = view.findViewById(R.id.btn_connect_old);
-        btnPairNew = view.findViewById(R.id.btn_pair_new);
-        btnStep1Back = view.findViewById(R.id.btn_step1_back);
         progressReconnect = view.findViewById(R.id.progress_reconnect);
 
-        tvPinDigit1 = view.findViewById(R.id.pin_digit1);
-        tvPinDigit2 = view.findViewById(R.id.pin_digit2);
-        tvPinDigit3 = view.findViewById(R.id.pin_digit3);
-        tvPinDigit4 = view.findViewById(R.id.pin_digit4);
-
-        Button btnStep1Next = view.findViewById(R.id.btn_step1_next);
-        Button btnStep2Back = view.findViewById(R.id.btn_step2_back);
         Button btnCancelReconnect = view.findViewById(R.id.btn_cancel_reconnect);
 
         // Load settings
@@ -99,170 +86,86 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
         savedPcName = prefs.getString(KEY_PAIRED_PC, "");
         final String savedIp = prefs.getString(KEY_PAIRED_IP, "");
 
-        editMobileName.setText(mobileName);
-
         // Setup Network Client
         networkClient = NetworkClient.getInstance();
         networkClient.addListener(this);
 
-        // Start scanning automatically on load to warm up cache
-        startDiscovery();
+        if (tvReconnectOptionsTitle != null) {
+            tvReconnectOptionsTitle.setText("Connect to Device");
+        }
 
-        // Setup custom pin entry keypad
-        setupKeypad(view);
+        // Configure "Connect to Device" button action
+        btnConnectOld.setOnClickListener(v -> {
+            if (discoveredServers.size() > 1) {
+                // Show choice dialog
+                final List<String> ips = new ArrayList<>(discoveredServers.keySet());
+                final List<String> hostnames = new ArrayList<>(discoveredServers.values());
+                CharSequence[] items = hostnames.toArray(new CharSequence[0]);
 
-        // Setup Retry Listener
-        btnRetryReconnect.setOnClickListener(v -> {
-            isAttemptingAutoReconnect = true;
-            btnRetryReconnect.setVisibility(View.GONE);
-            progressReconnect.setVisibility(View.VISIBLE);
-            tvReconnectStatus.setText("Reconnecting to " + (TextUtils.isEmpty(savedPcName) ? "Computer" : savedPcName) + "...");
-            tvReconnectSubtitle.setText("Searching for your paired computer on Wi-Fi.");
-            if (!TextUtils.isEmpty(savedIp)) {
-                networkClient.reconnect(savedIp, savedToken, mobileName);
+                new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                    .setTitle("Select a Computer")
+                    .setItems(items, (dialog, which) -> {
+                        String selectedIp = ips.get(which);
+                        String selectedName = hostnames.get(which);
+
+                        discoveredIp = selectedIp;
+                        isConnecting = true;
+                        showPanel(layoutReconnecting);
+                        tvReconnectStatus.setText("Connecting to " + selectedName + "...");
+                        tvReconnectSubtitle.setText("Establishing connection...");
+                        btnRetryReconnect.setVisibility(View.GONE);
+                        progressReconnect.setVisibility(View.VISIBLE);
+
+                        networkClient.connectAndAuthenticate(selectedIp, "0000", mobileName);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
             } else {
-                startDiscovery();
-            }
-            startReconnectTimeout(view);
-        });
-
-        // Wizard Flow Initial State
-        if (!TextUtils.isEmpty(savedToken)) {
-            // Setup choices buttons
-            btnConnectOld.setOnClickListener(oldBtnView -> {
-                isAttemptingAutoReconnect = true;
-                isFirstTimePairing = false;
+                isConnecting = true;
                 showPanel(layoutReconnecting);
-                tvReconnectStatus.setText("Reconnecting to " + (TextUtils.isEmpty(savedPcName) ? "Computer" : savedPcName) + "...");
+                tvReconnectStatus.setText("Connecting to " + (TextUtils.isEmpty(discoveredIp) ? (TextUtils.isEmpty(savedPcName) ? "Computer" : savedPcName) : networkClient.getDiscoveredHostname()) + "...");
+                tvReconnectSubtitle.setText("Establishing connection...");
                 btnRetryReconnect.setVisibility(View.GONE);
                 progressReconnect.setVisibility(View.VISIBLE);
 
-                if (!TextUtils.isEmpty(savedIp)) {
+                if (!TextUtils.isEmpty(discoveredIp)) {
+                    networkClient.connectAndAuthenticate(discoveredIp, "0000", mobileName);
+                } else if (!TextUtils.isEmpty(savedIp)) {
+                    isAttemptingAutoReconnect = true;
                     networkClient.reconnect(savedIp, savedToken, mobileName);
-                } else {
-                    startDiscovery();
                 }
-                startReconnectTimeout(view);
-            });
-
-            btnPairNew.setOnClickListener(newBtnView -> {
-                isAttemptingAutoReconnect = false;
-                stopDiscovery();
-                networkClient.disconnect();
-                // ACCIDENTAL CLICK FIX: Do NOT clear pairing data here. Just go to Step 1.
-                showPanel(layoutStep1);
-            });
-
-            // We have a saved pairing token, show reconnect options screen
-            showPanel(layoutReconnectOptions);
-            tvReconnectOptionsSubtitle.setText("Would you like to connect to '" + (TextUtils.isEmpty(savedPcName) ? "Computer" : savedPcName) + "'?");
-            btnConnectOld.setText("Connect to " + (TextUtils.isEmpty(savedPcName) ? "Computer" : savedPcName));
-        } else {
-            showPanel(layoutStep1);
-        }
-
-        // Button Listeners
-        btnStep1Next.setOnClickListener(v -> {
-            String name = editMobileName.getText().toString().trim();
-            if (TextUtils.isEmpty(name)) {
-                name = Build.MODEL;
             }
-            mobileName = name;
-            prefs.edit().putString(KEY_MOBILE_NAME, name).apply();
-            
-            isFirstTimePairing = true;
-            // Move to Step 2
-            showPanel(layoutStep2);
-            startDiscovery();
         });
 
-        btnStep1Back.setOnClickListener(v -> {
-            // Recover from accidental "Pair New Device" click
-            showPanel(layoutReconnectOptions);
-        });
-
-        btnStep2Back.setOnClickListener(v -> {
-            stopDiscovery();
-            isFirstTimePairing = false;
-            showPanel(layoutStep1);
-        });
-
-        btnStep2Connect.setOnClickListener(v -> {
-            String pin = pinBuilder.toString();
-            if (TextUtils.isEmpty(discoveredIp)) {
-                Toast.makeText(getContext(), "Searching for computer... Please make sure SwiftDock is running.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            if (pin.length() != 4) {
-                Toast.makeText(getContext(), "Please enter a valid 4-digit PIN", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            isFirstTimePairing = true;
-            btnStep2Connect.setEnabled(false);
-            btnStep2Connect.setText("Connecting...");
-            networkClient.connectAndAuthenticate(discoveredIp, pin, mobileName);
-        });
-
+        // Setup Cancel button on connecting screen to go back to choices
         btnCancelReconnect.setOnClickListener(v -> {
+            isConnecting = false;
             isAttemptingAutoReconnect = false;
             stopDiscovery();
             networkClient.disconnect();
-            clearPairingData();
-            showPanel(layoutStep1);
+            
+            showPanel(layoutReconnectOptions);
+            startDiscovery();
         });
-    }
 
-    private void setupKeypad(View view) {
-        int[] buttonIds = new int[]{
-                R.id.keypad_0, R.id.keypad_1, R.id.keypad_2, R.id.keypad_3,
-                R.id.keypad_4, R.id.keypad_5, R.id.keypad_6, R.id.keypad_7,
-                R.id.keypad_8, R.id.keypad_9
-        };
+        // Initialize state: Show Connect Options panel by default
+        showPanel(layoutReconnectOptions);
+        isConnecting = false;
 
-        for (int i = 0; i < buttonIds.length; i++) {
-            final String digit = String.valueOf(i);
-            View btn = view.findViewById(buttonIds[i]);
-            if (btn != null) {
-                btn.setOnClickListener(v -> {
-                    if (pinBuilder.length() < 4) {
-                        pinBuilder.append(digit);
-                        updatePinDisplay();
-                    }
-                });
-            }
+        // If there's a saved connection, make it the default option on the button
+        if (!TextUtils.isEmpty(savedIp) && !TextUtils.isEmpty(savedToken)) {
+            btnConnectOld.setEnabled(true);
+            btnConnectOld.setText("Connect to " + (TextUtils.isEmpty(savedPcName) ? "Computer" : savedPcName));
+            tvReconnectOptionsSubtitle.setText("Saved computer: " + (TextUtils.isEmpty(savedPcName) ? "Computer" : savedPcName) + ". Tap below to connect.");
+        } else {
+            // Disabled until a server is discovered on Wi-Fi
+            btnConnectOld.setEnabled(false);
+            btnConnectOld.setText("Connect to Device");
+            tvReconnectOptionsSubtitle.setText("Searching for computer on Wi-Fi...");
         }
 
-        View btnBack = view.findViewById(R.id.keypad_backspace);
-        if (btnBack != null) {
-            btnBack.setOnClickListener(v -> {
-                if (pinBuilder.length() > 0) {
-                    pinBuilder.deleteCharAt(pinBuilder.length() - 1);
-                    updatePinDisplay();
-                }
-            });
-        }
-
-        View btnClear = view.findViewById(R.id.keypad_clear);
-        if (btnClear != null) {
-            btnClear.setOnClickListener(v -> {
-                pinBuilder.setLength(0);
-                updatePinDisplay();
-            });
-        }
-    }
-
-    private void updatePinDisplay() {
-        String pin = pinBuilder.toString();
-        
-        if (tvPinDigit1 != null) tvPinDigit1.setText(pin.length() > 0 ? String.valueOf(pin.charAt(0)) : "");
-        if (tvPinDigit2 != null) tvPinDigit2.setText(pin.length() > 1 ? String.valueOf(pin.charAt(1)) : "");
-        if (tvPinDigit3 != null) tvPinDigit3.setText(pin.length() > 2 ? String.valueOf(pin.charAt(2)) : "");
-        if (tvPinDigit4 != null) tvPinDigit4.setText(pin.length() > 3 ? String.valueOf(pin.charAt(3)) : "");
-        
-        if (btnStep2Connect != null) {
-            btnStep2Connect.setEnabled(pin.length() == 4);
-        }
+        // Start discovery in background
+        startDiscovery();
     }
 
     private void startDiscovery() {
@@ -278,78 +181,17 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
     }
 
     private void showPanel(LinearLayout panel) {
-        layoutStep1.setVisibility(View.GONE);
-        layoutStep2.setVisibility(View.GONE);
-        layoutStep3.setVisibility(View.GONE);
         layoutReconnecting.setVisibility(View.GONE);
         layoutReconnectOptions.setVisibility(View.GONE);
 
         panel.setVisibility(View.VISIBLE);
-
-        if (panel == layoutStep1) {
-            // Show/Hide recovery back button based on saved pairing status
-            if (btnStep1Back != null) {
-                btnStep1Back.setVisibility(TextUtils.isEmpty(savedToken) ? View.GONE : View.VISIBLE);
-            }
-            editMobileName.requestFocus();
-            showKeyboard(editMobileName);
-        } else {
-            editMobileName.clearFocus();
-            hideKeyboard();
-
-            if (panel == layoutStep2) {
-                // Clear PIN entry when entering panel
-                pinBuilder.setLength(0);
-                updatePinDisplay();
-            }
-        }
-    }
-
-    private void showKeyboard(View view) {
-        if (getContext() == null) return;
-        view.postDelayed(() -> {
-            if (isAdded()) {
-                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) 
-                        requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-                if (imm != null) {
-                    imm.showSoftInput(view, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
-                }
-            }
-        }, 100);
-    }
-
-    private void hideKeyboard() {
-        if (getContext() == null) return;
-        android.view.View focusedView = requireActivity().getCurrentFocus();
-        if (focusedView == null) {
-            focusedView = new android.view.View(requireContext());
-        }
-        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) 
-                requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (imm != null) {
-            imm.hideSoftInputFromWindow(focusedView.getWindowToken(), 0);
-        }
-    }
-
-    private void startReconnectTimeout(final View view) {
-        view.postDelayed(() -> {
-            if (isAttemptingAutoReconnect && isAdded()) {
-                isAttemptingAutoReconnect = false;
-                stopDiscovery();
-                
-                // Show Connection Offline screen with retry option
-                progressReconnect.setVisibility(View.GONE);
-                tvReconnectStatus.setText("Connection Offline");
-                tvReconnectSubtitle.setText("Could not find " + (TextUtils.isEmpty(savedPcName) ? "paired computer" : savedPcName) + ". Make sure SwiftDock is running.");
-                btnRetryReconnect.setVisibility(View.VISIBLE);
-            }
-        }, 6000);
     }
 
     private void clearPairingData() {
         savedToken = "";
         savedPcName = "";
         discoveredIp = null;
+        discoveredServers.clear();
         requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString(KEY_PAIRED_TOKEN, "")
@@ -361,89 +203,109 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        stopDiscovery();
         networkClient.removeListener(this);
     }
-
+ 
     // Network Callbacks
     @Override
     public void onServerDiscovered(String ip, int port, String hostname) {
         if (!isAdded()) return;
-
-        tvDiscoveryStatus.setText("Ready to Connect to " + hostname);
-        discoveredIp = ip;
+ 
+        discoveredServers.put(ip, hostname);
         
-        if (isAttemptingAutoReconnect && !TextUtils.isEmpty(savedToken)) {
-            // Auto-reconnect triggered on discovery
-            isAttemptingAutoReconnect = false;
-            networkClient.reconnect(ip, savedToken, mobileName);
+        if (layoutReconnectOptions.getVisibility() == View.VISIBLE) {
+            if (discoveredServers.size() == 1) {
+                discoveredIp = ip;
+                tvReconnectOptionsSubtitle.setText("Found computer: " + hostname + " on Wi-Fi.");
+                btnConnectOld.setText("Connect to " + hostname);
+            } else {
+                discoveredIp = null; // Forces user to choose from dialog
+                tvReconnectOptionsSubtitle.setText("Found " + discoveredServers.size() + " computers on Wi-Fi. Tap below to select.");
+                btnConnectOld.setText("Connect to Device...");
+            }
+            btnConnectOld.setEnabled(true);
         }
     }
-
+ 
     @Override
     public void onConnectionSuccess(String token) {
         if (!isAdded()) return;
-
+ 
         SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String ip = discoveredIp != null ? discoveredIp : prefs.getString(KEY_PAIRED_IP, "");
         String hostname = networkClient.getDiscoveredHostname();
         if (TextUtils.isEmpty(hostname)) {
             hostname = "Computer";
         }
-
+ 
         prefs.edit()
                 .putString(KEY_PAIRED_TOKEN, token)
                 .putString(KEY_PAIRED_PC, hostname)
                 .putString(KEY_PAIRED_IP, ip)
                 .apply();
-
+ 
         stopDiscovery();
+        isConnecting = false;
         
-        if (isFirstTimePairing) {
-            showPanel(layoutStep3);
-        } else {
-            // Jump directly to grid
-            NavHostFragment.findNavController(FirstFragment.this)
-                    .navigate(R.id.action_FirstFragment_to_SecondFragment);
-        }
+        // Jump directly to grid
+        NavHostFragment.findNavController(FirstFragment.this)
+                .navigate(R.id.action_FirstFragment_to_SecondFragment);
     }
-
+ 
     @Override
     public void onConnectionFailed(String reason) {
         if (!isAdded()) return;
-
-        Toast.makeText(getContext(), reason, Toast.LENGTH_LONG).show();
-        btnStep2Connect.setEnabled(true);
-        btnStep2Connect.setText("Connect");
-
-        if (isAttemptingAutoReconnect) {
-            isAttemptingAutoReconnect = false;
-            stopDiscovery();
-            
-            // Show Connection Offline screen with retry option
-            progressReconnect.setVisibility(View.GONE);
-            tvReconnectStatus.setText("Connection Failed");
-            tvReconnectSubtitle.setText(reason);
-            btnRetryReconnect.setVisibility(View.VISIBLE);
+ 
+        isConnecting = false;
+        isAttemptingAutoReconnect = false;
+ 
+        Toast.makeText(getContext(), reason, Toast.LENGTH_SHORT).show();
+ 
+        showPanel(layoutReconnectOptions);
+        
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String savedIp = prefs.getString(KEY_PAIRED_IP, "");
+        String savedPcName = prefs.getString(KEY_PAIRED_PC, "");
+ 
+        if (discoveredServers.size() > 1) {
+            tvReconnectOptionsSubtitle.setText("Connection failed. Found " + discoveredServers.size() + " computers on Wi-Fi.");
+            btnConnectOld.setText("Connect to Device...");
+            btnConnectOld.setEnabled(true);
+        } else if (!TextUtils.isEmpty(discoveredIp)) {
+            String hostname = discoveredServers.get(discoveredIp);
+            if (TextUtils.isEmpty(hostname)) hostname = networkClient.getDiscoveredHostname();
+            tvReconnectOptionsSubtitle.setText("Connection failed. Found computer: " + (TextUtils.isEmpty(hostname) ? "Device" : hostname));
+            btnConnectOld.setText("Connect to " + (TextUtils.isEmpty(hostname) ? "Device" : hostname));
+            btnConnectOld.setEnabled(true);
+        } else if (!TextUtils.isEmpty(savedIp)) {
+            tvReconnectOptionsSubtitle.setText("Connection failed. Saved computer: " + (TextUtils.isEmpty(savedPcName) ? "Computer" : savedPcName));
+            btnConnectOld.setText("Connect to " + (TextUtils.isEmpty(savedPcName) ? "Computer" : savedPcName));
+            btnConnectOld.setEnabled(true);
+        } else {
+            tvReconnectOptionsSubtitle.setText("Connection failed. Searching on Wi-Fi...");
+            btnConnectOld.setText("Connect to Device");
+            btnConnectOld.setEnabled(false);
         }
+ 
+        startDiscovery();
     }
-
+ 
     @Override
     public void onDisconnected() {
         if (!isAdded()) return;
-
-        btnStep2Connect.setEnabled(true);
-        btnStep2Connect.setText("Connect");
+        isConnecting = false;
     }
-
+ 
     @Override
     public void onButtonsSynced(List<ShortcutButton> buttons) {
         // Handled in SecondFragment (Grid screen)
     }
-
+ 
     @Override
     public void onTransitionToGrid() {
         if (!isAdded()) return;
-
+ 
         // Transition to second fragment (shortcuts grid)
         NavHostFragment.findNavController(FirstFragment.this)
                 .navigate(R.id.action_FirstFragment_to_SecondFragment);

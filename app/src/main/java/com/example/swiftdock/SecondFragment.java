@@ -196,12 +196,21 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        networkClient.stopDiscovery();
         networkClient.removeListener(this);
     }
 
     // Network Callbacks
     @Override
-    public void onServerDiscovered(String ip, int port, String hostname) {}
+    public void onServerDiscovered(String ip, int port, String hostname) {
+        if (!isAdded()) return;
+        if (isReconnecting && !networkClient.isConnected()) {
+            SharedPreferences prefs = requireContext().getSharedPreferences("SwiftDockPrefs", Context.MODE_PRIVATE);
+            String savedToken = prefs.getString("paired_token", "");
+            String mobileName = prefs.getString("mobile_name", android.os.Build.MODEL);
+            networkClient.reconnect(ip, savedToken, mobileName);
+        }
+    }
 
     @Override
     public void onConnectionSuccess(String token) {
@@ -209,6 +218,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
         if (isReconnecting) {
             isReconnecting = false;
             reconnectHandler.removeCallbacks(reconnectRunnable);
+            networkClient.stopDiscovery();
             if (layoutReconnectingOverlay != null) {
                 layoutReconnectingOverlay.setVisibility(View.GONE);
             }
@@ -235,6 +245,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             if (layoutReconnectingOverlay != null) {
                 layoutReconnectingOverlay.setVisibility(View.VISIBLE);
             }
+            networkClient.startDiscovery(requireContext());
             reconnectHandler.removeCallbacks(reconnectRunnable);
             reconnectHandler.post(reconnectRunnable);
         }
@@ -916,7 +927,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
         Button btnYes = dialogView.findViewById(R.id.btn_confirm_yes);
 
         if (tvTitle != null) tvTitle.setText("Confirm Disconnect");
-        if (tvMessage != null) tvMessage.setText("Are you sure you want to disconnect and exit SwiftDock?");
+        if (tvMessage != null) tvMessage.setText("Are you sure you want to disconnect from SwiftDock?");
         
         if (btnYes != null) {
             btnYes.setBackgroundResource(R.drawable.button_danger);
@@ -925,7 +936,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                 dialog.dismiss();
                 isUserDisconnecting = true;
                 networkClient.disconnect();
-                requireActivity().finishAffinity();
+                navigateToConnectScreen();
             });
         }
 
