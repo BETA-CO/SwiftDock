@@ -173,17 +173,126 @@ public class MainActivity extends AppCompatActivity {
     private void showUpdatePrompt(String versionName, String apkUrl, String changelog) {
         new androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("Update Available")
-            .setMessage("A new version of SwiftDock (v" + versionName + ") is available.\n\nChangelog:\n" + changelog + "\n\nDo you want to download it now?")
-            .setPositiveButton("Update Now", (dialog, which) -> {
-                try {
-                    android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
-                    intent.setData(android.net.Uri.parse(apkUrl));
-                    startActivity(intent);
-                } catch (Exception e) {
-                    android.widget.Toast.makeText(this, "Failed to open browser: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
-                }
-            })
+            .setMessage("A new version of SwiftDock (v" + versionName + ") is available.\n\nChangelog:\n" + changelog + "\n\nDo you want to download and install it now?")
+            .setPositiveButton("Update Now", (dialog, which) -> downloadAndInstallApk(apkUrl))
             .setNegativeButton("Later", null)
             .show();
+    }
+
+    private void downloadAndInstallApk(String apkUrl) {
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 40);
+
+        android.widget.ProgressBar progressBar = new android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progressBar.setMax(100);
+        progressBar.setProgress(0);
+        progressBar.setIndeterminate(false);
+        progressBar.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+
+        android.widget.TextView tvProgress = new android.widget.TextView(this);
+        tvProgress.setText("0%");
+        tvProgress.setGravity(android.view.Gravity.RIGHT);
+        tvProgress.setPadding(0, 10, 0, 0);
+
+        layout.addView(progressBar);
+        layout.addView(tvProgress);
+
+        androidx.appcompat.app.AlertDialog progressDialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Downloading Update")
+                .setView(layout)
+                .setCancelable(false)
+                .create();
+
+        progressDialog.show();
+
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+
+        executor.execute(() -> {
+            java.net.HttpURLConnection connection = null;
+            java.io.InputStream input = null;
+            java.io.OutputStream output = null;
+            java.io.File apkFile = null;
+            try {
+                java.net.URL url = new java.net.URL(apkUrl);
+                connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.connect();
+
+                int fileLength = connection.getContentLength();
+                input = connection.getInputStream();
+
+                apkFile = new java.io.File(getExternalCacheDir(), "SwiftDockUpdate.apk");
+                output = new java.io.FileOutputStream(apkFile);
+
+                byte[] data = new byte[8192];
+                long total = 0;
+                int count;
+                while ((count = input.read(data)) != -1) {
+                    total += count;
+                    if (fileLength > 0) {
+                        int progress = (int) (total * 100 / fileLength);
+                        handler.post(() -> {
+                            progressBar.setProgress(progress);
+                            tvProgress.setText(progress + "%");
+                        });
+                    }
+                    output.write(data, 0, count);
+                }
+                output.flush();
+
+                final java.io.File finalApkFile = apkFile;
+                handler.post(() -> {
+                    progressDialog.dismiss();
+                    installApk(finalApkFile);
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                handler.post(() -> {
+                    progressDialog.dismiss();
+                    android.widget.Toast.makeText(this, "Download failed: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+                });
+            } finally {
+                try {
+                    if (output != null) output.close();
+                    if (input != null) input.close();
+                } catch (Exception ignored) {}
+                if (connection != null) connection.disconnect();
+            }
+        });
+    }
+
+    private void installApk(java.io.File file) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            if (!getPackageManager().canRequestPackageInstalls()) {
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Permission Required")
+                    .setMessage("To install updates directly, SwiftDock requires the 'Install unknown apps' permission.\n\nPlease enable it in the system settings.")
+                    .setPositiveButton("Settings", (dialog, which) -> {
+                        android.content.Intent intent = new android.content.Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                        intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                        startActivity(intent);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+                return;
+            }
+        }
+
+        android.net.Uri apkUri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                getPackageName() + ".fileprovider",
+                file
+        );
+
+        android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+        intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+        intent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
     }
 }
