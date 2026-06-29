@@ -41,6 +41,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
     private List<ShortcutButton> buttonsList = new ArrayList<>();
     private PagerAdapter pagerAdapter;
 
+
     private boolean isUserDisconnecting = false;
     private boolean isReconnecting = false;
     private boolean isHoldingButton = false;
@@ -56,7 +57,10 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                 String mobileName = prefs.getString("mobile_name", android.os.Build.MODEL);
 
                 if (!android.text.TextUtils.isEmpty(savedIp) && !android.text.TextUtils.isEmpty(savedToken)) {
-                    networkClient.reconnect(savedIp, savedToken, mobileName);
+                    boolean isLandscape = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+                    int cols = isTablet() ? (isLandscape ? 5 : 3) : (isLandscape ? 4 : 2);
+                    int rows = isTablet() ? (isLandscape ? 3 : 5) : (isLandscape ? 2 : 4);
+                    networkClient.reconnect(savedIp, savedToken, mobileName, cols, rows);
                 }
             }
         }
@@ -74,8 +78,8 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Force Landscape orientation during dashboard grid view
-        requireActivity().setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        // Force Sensor-based Auto-rotation (allowing portrait and landscape)
+        requireActivity().setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
 
         viewPager = view.findViewById(R.id.view_pager);
         layoutDots = view.findViewById(R.id.layout_dots);
@@ -89,6 +93,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
         // Setup Pager
         pagerAdapter = new PagerAdapter();
         viewPager.setAdapter(pagerAdapter);
+        updateLayoutForOrientation(getResources().getConfiguration().orientation);
 
         // Dot indicators initialization
         int pageCount = getPageCount();
@@ -119,6 +124,8 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                 navigateToConnectScreen();
             });
         }
+
+
     }
 
     private void setButtonsList(List<ShortcutButton> buttons) {
@@ -138,7 +145,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
 
     private int getPageCount() {
         if (buttonsList.isEmpty()) return 1;
-        return (int) Math.ceil(buttonsList.size() / 8.0);
+        return (int) Math.ceil(buttonsList.size() / (double) getPageSize());
     }
 
     private void setupDots(int count) {
@@ -151,7 +158,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
             );
-            params.setMargins(6, 0, 6, 0);
+            params.setMargins(dpToPx(6), dpToPx(6), dpToPx(6), dpToPx(6));
             dot.setLayoutParams(params);
             dot.setImageResource(R.drawable.dot_inactive);
             layoutDots.addView(dot);
@@ -208,7 +215,10 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             SharedPreferences prefs = requireContext().getSharedPreferences("SwiftDockPrefs", Context.MODE_PRIVATE);
             String savedToken = prefs.getString("paired_token", "");
             String mobileName = prefs.getString("mobile_name", android.os.Build.MODEL);
-            networkClient.reconnect(ip, savedToken, mobileName);
+            boolean isLandscape = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+            int cols = isTablet() ? (isLandscape ? 5 : 3) : (isLandscape ? 4 : 2);
+            int rows = isTablet() ? (isLandscape ? 3 : 5) : (isLandscape ? 2 : 4);
+            networkClient.reconnect(ip, savedToken, mobileName, cols, rows);
         }
     }
 
@@ -296,25 +306,44 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
         @Override
         public PageViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(getContext()).inflate(R.layout.item_grid_page, parent, false);
+            view.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
             return new PageViewHolder(view);
         }
 
         @Override
         public void onBindViewHolder(@NonNull PageViewHolder holder, int position) {
-            int start = position * 8;
-            int end = Math.min(start + 8, buttonsList.size());
+            int pageSize = getPageSize();
+            int start = position * pageSize;
+            int end = Math.min(start + pageSize, buttonsList.size());
             
             List<ShortcutButton> pageButtons = new ArrayList<>();
             if (start < buttonsList.size()) {
                 pageButtons.addAll(buttonsList.subList(start, end));
             }
 
+            boolean isLandscape = holder.gridView.getContext().getResources().getConfiguration().orientation 
+                    == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+            if (isTablet()) {
+                holder.gridView.setNumColumns(isLandscape ? 5 : 3);
+            } else {
+                holder.gridView.setNumColumns(isLandscape ? 4 : 2);
+            }
+
             GridAdapter gridAdapter = new GridAdapter(pageButtons);
             holder.gridView.setAdapter(gridAdapter);
+            holder.gridView.setNestedScrollingEnabled(false);
+
+            float density = holder.gridView.getContext().getResources().getDisplayMetrics().density;
+            boolean swipeHorizontal = isTablet() || isLandscape;
+            int paddingLeft = (int) (16 * density);
+            int paddingTop = (int) (16 * density);
+            int paddingRight = (int) ((swipeHorizontal ? 16 : 40) * density);
+            int paddingBottom = (int) (16 * density);
+            holder.gridView.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
 
             // Handle grid button taps
             holder.gridView.setOnItemClickListener((parent, view, gridPos, id) -> {
-                int absolutePos = (position * 8) + gridPos;
+                int absolutePos = (position * getPageSize()) + gridPos;
                 if (absolutePos < buttonsList.size()) {
                     ShortcutButton btn = buttonsList.get(absolutePos);
                     if ("SWIFTDOCK_INTERNAL_SETTINGS".equals(btn.getId())) {
@@ -389,23 +418,59 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                 holder.cardView = convertView.findViewById(R.id.card_view);
                 holder.tvTitle = convertView.findViewById(R.id.btn_title);
                 holder.ivIcon = convertView.findViewById(R.id.btn_icon);
+                holder.btnContentContainer = convertView.findViewById(R.id.btn_content_container);
                 convertView.setTag(holder);
             } else {
                 holder = (ViewHolder) convertView.getTag();
             }
 
-            // Set height to exactly half of available parent height (since 2 rows), accounting for padding and cell spacing
+            // Set height dynamically based on rows (2 for landscape, 4 for portrait)
+            boolean isLandscape = getResources().getConfiguration().orientation 
+                    == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+            int numRows;
+            if (isTablet()) {
+                numRows = isLandscape ? 3 : 5;
+            } else {
+                numRows = isLandscape ? 2 : 4;
+            }
+
             int parentHeight = parent.getHeight();
             if (parentHeight > 0) {
-                int verticalSpacing = (int) (12 * getResources().getDisplayMetrics().density);
-                int padding = (int) (16 * getResources().getDisplayMetrics().density);
-                int availableHeight = parentHeight - (padding * 2) - verticalSpacing;
+                float density = getResources().getDisplayMetrics().density;
+                int verticalSpacing = (int) (12 * density);
+                int paddingLeft = (int) (16 * density);
+                int paddingTop = (int) (16 * density);
+                boolean dotsAtBottom = isTablet() || isLandscape;
+                int paddingRight = (int) ((dotsAtBottom ? 16 : 40) * density);
+                int paddingBottom = (int) (16 * density);
+
+                int totalSpacing = (numRows - 1) * verticalSpacing;
+                int availableHeight = parentHeight - paddingTop - paddingBottom - totalSpacing;
+                if (dotsAtBottom) {
+                    // Reserve bottom margin space for page indicator dots
+                    availableHeight -= (int) (32 * density);
+                }
+
+                int cellHeight = availableHeight / numRows;
+
+                int numColumns = isTablet() ? (isLandscape ? 5 : 3) : (isLandscape ? 4 : 2);
+                int horizontalSpacing = (int) (12 * density);
+                int gridWidth = parent.getWidth();
+                if (gridWidth > 0 && isTablet()) {
+                    int totalHorizontalSpacing = (numColumns - 1) * horizontalSpacing;
+                    int availableWidth = gridWidth - paddingLeft - paddingRight - totalHorizontalSpacing;
+                    int cellWidth = availableWidth / numColumns;
+                    int maxCellHeight = (int) (cellWidth * 1.05);
+                    if (cellHeight > maxCellHeight) {
+                        cellHeight = maxCellHeight;
+                    }
+                }
 
                 ViewGroup.LayoutParams lp = convertView.getLayoutParams();
                 if (lp == null) {
-                    lp = new GridView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, availableHeight / 2);
+                    lp = new GridView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, cellHeight);
                 } else {
-                    lp.height = availableHeight / 2;
+                    lp.height = cellHeight;
                 }
                 convertView.setLayoutParams(lp);
 
@@ -426,8 +491,9 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             
             android.widget.FrameLayout.LayoutParams iconLp = (android.widget.FrameLayout.LayoutParams) holder.ivIcon.getLayoutParams();
             if (isPerfBtn) {
-                iconLp.width = dpToPx(34);
-                iconLp.height = dpToPx(34);
+                int size = isTablet() ? 44 : 34;
+                iconLp.width = dpToPx(size);
+                iconLp.height = dpToPx(size);
                 iconLp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
                 iconLp.topMargin = dpToPx(6);
                 iconLp.leftMargin = dpToPx(6);
@@ -460,12 +526,13 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                 
                 holder.tvTitle.setVisibility(View.VISIBLE);
                 String displayTxt = iconValue.substring(5);
-                float textSize = displayTxt.length() <= 2 ? 24f : 13f; // Large font for 1-2 char emojis/letters, smaller for words
+                float textSize = displayTxt.length() <= 2 ? (isTablet() ? 36f : 24f) : (isTablet() ? 18f : 13f); // Large font for 1-2 char emojis/letters, smaller for words
                 holder.tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, textSize);
                 holder.tvTitle.setText(displayTxt);
             } else {
-                iconLp.width = dpToPx(48);
-                iconLp.height = dpToPx(48);
+                int size = isTablet() ? 64 : 48;
+                iconLp.width = dpToPx(size);
+                iconLp.height = dpToPx(size);
                 iconLp.gravity = android.view.Gravity.CENTER;
                 iconLp.topMargin = 0;
                 iconLp.leftMargin = 0;
@@ -480,10 +547,10 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             // Apply solid/gradient black keycap with tactile press states
             holder.cardView.setBackground(getFuturisticKeycapDrawable(btn.getColor()));
 
-            // Remove any dynamically added grid view from holder.cardView first
-            View oldDynamicGrid = holder.cardView.findViewWithTag("dynamic_url_grid");
-            if (oldDynamicGrid != null && holder.cardView instanceof ViewGroup) {
-                ((ViewGroup) holder.cardView).removeView(oldDynamicGrid);
+            // Remove any dynamically added grid view from holder.btnContentContainer first
+            View oldDynamicGrid = holder.btnContentContainer.findViewWithTag("dynamic_url_grid");
+            if (oldDynamicGrid != null && holder.btnContentContainer instanceof ViewGroup) {
+                ((ViewGroup) holder.btnContentContainer).removeView(oldDynamicGrid);
             }
 
             if (iconValue != null && iconValue.contains("|")) {
@@ -491,8 +558,8 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                 if (parts.length > 1) {
                     holder.ivIcon.setVisibility(View.GONE);
                     View gridView = createDynamicGrid(parts);
-                    if (holder.cardView instanceof ViewGroup) {
-                        ((ViewGroup) holder.cardView).addView(gridView);
+                    if (holder.btnContentContainer instanceof ViewGroup) {
+                        ((ViewGroup) holder.btnContentContainer).addView(gridView);
                     }
                 } else {
                     holder.ivIcon.setVisibility(View.VISIBLE);
@@ -519,13 +586,17 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                         }
                     };
 
+                    private float downX = 0f;
+                    private float downY = 0f;
+                    private boolean isDragging = false;
+
                     @Override
                     public boolean onTouch(View v, android.view.MotionEvent event) {
-                        if (v.getParent() != null) {
-                            v.getParent().requestDisallowInterceptTouchEvent(true);
-                        }
                         switch (event.getAction()) {
                             case android.view.MotionEvent.ACTION_DOWN:
+                                downX = event.getRawX();
+                                downY = event.getRawY();
+                                isDragging = false;
                                 isHoldingButton = true;
                                 if (networkClient.isConnected()) {
                                     networkClient.sendButtonPress(btn.getId());
@@ -536,10 +607,32 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
                                 if (finalCardView != null) {
                                     finalCardView.setPressed(true);
                                 }
+                                if (v.getParent() != null) {
+                                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                                }
                                 return true;
 
                             case android.view.MotionEvent.ACTION_MOVE:
-                                // Consuming ACTION_MOVE keeps the touch session active and ignores finger drifts
+                                if (isDragging) {
+                                    return false;
+                                }
+                                float dx = event.getRawX() - downX;
+                                float dy = event.getRawY() - downY;
+                                float distance = (float) Math.sqrt(dx * dx + dy * dy);
+                                int touchSlop = android.view.ViewConfiguration.get(v.getContext()).getScaledTouchSlop();
+                                if (distance > touchSlop) {
+                                    isDragging = true;
+                                    isHoldingButton = false;
+                                    repeatHandler.removeCallbacks(repeatRunnable);
+                                    v.setPressed(false);
+                                    if (finalCardView != null) {
+                                        finalCardView.setPressed(false);
+                                    }
+                                    if (v.getParent() != null) {
+                                        v.getParent().requestDisallowInterceptTouchEvent(false);
+                                    }
+                                    return false;
+                                }
                                 return true;
 
                             case android.view.MotionEvent.ACTION_UP:
@@ -558,6 +651,8 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             } else {
                 convertView.setOnTouchListener(null);
             }
+
+
 
             return convertView;
         }
@@ -589,8 +684,9 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             android.widget.LinearLayout root = new android.widget.LinearLayout(getContext());
             root.setTag("dynamic_url_grid");
             root.setOrientation(android.widget.LinearLayout.VERTICAL);
+            int sizeDp = isTablet() ? 72 : 54;
             android.widget.FrameLayout.LayoutParams rootLp = new android.widget.FrameLayout.LayoutParams(
-                    dpToPx(54), dpToPx(54), android.view.Gravity.CENTER
+                    dpToPx(sizeDp), dpToPx(sizeDp), android.view.Gravity.CENTER
             );
             root.setLayoutParams(rootLp);
             root.setGravity(android.view.Gravity.CENTER);
@@ -748,7 +844,63 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             View cardView;
             TextView tvTitle;
             ImageView ivIcon;
+            View btnContentContainer;
         }
+    }
+
+    private void updateLayoutForOrientation(int orientation) {
+        boolean isLandscape = (orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE);
+        boolean isTabletDevice = isTablet();
+        boolean swipeHorizontal = isTabletDevice || isLandscape;
+
+        if (viewPager != null) {
+            viewPager.setOrientation(swipeHorizontal ? ViewPager2.ORIENTATION_HORIZONTAL : ViewPager2.ORIENTATION_VERTICAL);
+            viewPager.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+        }
+        if (layoutDots != null) {
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp = 
+                (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) layoutDots.getLayoutParams();
+            if (swipeHorizontal) {
+                layoutDots.setOrientation(LinearLayout.HORIZONTAL);
+                
+                lp.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET;
+                
+                lp.bottomMargin = dpToPx(12);
+                lp.rightMargin = 0;
+                lp.leftMargin = 0;
+                lp.topMargin = 0;
+            } else {
+                layoutDots.setOrientation(LinearLayout.VERTICAL);
+                
+                lp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET;
+                
+                lp.rightMargin = dpToPx(16);
+                lp.leftMargin = 0;
+                lp.bottomMargin = 0;
+                lp.topMargin = 0;
+            }
+            layoutDots.setLayoutParams(lp);
+        }
+        if (pagerAdapter != null) {
+            pagerAdapter.notifyDataSetChanged();
+        }
+        if (networkClient.isConnected()) {
+            int cols = isTabletDevice ? (isLandscape ? 5 : 3) : (isLandscape ? 4 : 2);
+            int rows = isTabletDevice ? (isLandscape ? 3 : 5) : (isLandscape ? 2 : 4);
+            networkClient.sendLayoutChange(cols, rows);
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(@NonNull android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        updateLayoutForOrientation(newConfig.orientation);
     }
 
     private void showSettingsDialog() {
@@ -766,7 +918,6 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
 
         View btnChangeName = dialogView.findViewById(R.id.option_change_name);
         View btnChangeProfile = dialogView.findViewById(R.id.option_change_profile);
-        View btnPairNew = dialogView.findViewById(R.id.option_pair_new);
         View btnDisconnect = dialogView.findViewById(R.id.option_disconnect);
         View btnCancel = dialogView.findViewById(R.id.option_cancel);
 
@@ -801,10 +952,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             showChangeProfileDialog();
         });
 
-        btnPairNew.setOnClickListener(v -> {
-            dialog.dismiss();
-            showPairNewConfirmation();
-        });
+
 
         btnDisconnect.setOnClickListener(v -> {
             dialog.dismiss();
@@ -947,44 +1095,6 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
         dialog.show();
     }
 
-    private void showPairNewConfirmation() {
-        if (!isAdded()) return;
-        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_confirm, null);
-        
-        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                .setView(dialogView)
-                .create();
-        
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
-        }
-
-        TextView tvTitle = dialogView.findViewById(R.id.dialog_confirm_title);
-        TextView tvMessage = dialogView.findViewById(R.id.dialog_confirm_message);
-        View btnNo = dialogView.findViewById(R.id.btn_confirm_no);
-        Button btnYes = dialogView.findViewById(R.id.btn_confirm_yes);
-
-        if (tvTitle != null) tvTitle.setText("Pair New Device");
-        if (tvMessage != null) tvMessage.setText("Are you sure you want to unpair this computer and pair a new device?");
-        
-        if (btnYes != null) {
-            btnYes.setBackgroundResource(R.drawable.button_danger);
-            btnYes.setText("Unpair & Pair");
-            btnYes.setOnClickListener(v -> {
-                dialog.dismiss();
-                isUserDisconnecting = true;
-                networkClient.disconnect();
-                clearPairingPrefs();
-                navigateToConnectScreen();
-            });
-        }
-
-        if (btnNo != null) {
-            btnNo.setOnClickListener(v -> dialog.dismiss());
-        }
-
-        dialog.show();
-    }
 
     private boolean isActionRepeatable(ShortcutButton btn) {
         if (btn == null) return false;
@@ -1000,8 +1110,17 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
         return false;
     }
 
-    private int dpToPx(int dp) {
-        if (getContext() == null) return dp;
+    private int dpToPx(float dp) {
+        if (getContext() == null) return (int) dp;
         return (int) (dp * getResources().getDisplayMetrics().density);
+    }
+
+    private boolean isTablet() {
+        if (getContext() == null) return false;
+        return getResources().getConfiguration().smallestScreenWidthDp >= 600;
+    }
+
+    private int getPageSize() {
+        return isTablet() ? 15 : 8;
     }
 }

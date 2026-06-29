@@ -340,7 +340,7 @@ public class NetworkClient {
     }
 
     // Connect and Pair with PIN
-    public void connectAndAuthenticate(final String ip, final String pin, final String mobileName) {
+    public void connectAndAuthenticate(final String ip, final String pin, final String mobileName, final int cols, final int rows) {
         if (ip == null || ip.trim().isEmpty()) {
             notifyConnectionFailed("Please enter a valid IP address.");
             return;
@@ -360,6 +360,8 @@ public class NetworkClient {
                 authRequest.put("type", "AUTH");
                 authRequest.put("pin", pin);
                 authRequest.put("deviceName", mobileName);
+                authRequest.put("cols", cols);
+                authRequest.put("rows", rows);
 
                 sendRaw(authRequest.toString());
 
@@ -392,8 +394,7 @@ public class NetworkClient {
         }).start();
     }
 
-    // Reconnect with existing token
-    public void reconnect(final String ip, final String savedToken, final String mobileName) {
+    public void reconnect(final String ip, final String savedToken, final String mobileName, final int cols, final int rows) {
         if (ip == null || ip.trim().isEmpty()) {
             notifyConnectionFailed("Server IP address is missing.");
             return;
@@ -413,6 +414,8 @@ public class NetworkClient {
                 reconnectRequest.put("type", "RECONNECT");
                 reconnectRequest.put("token", savedToken);
                 reconnectRequest.put("deviceName", mobileName);
+                reconnectRequest.put("cols", cols);
+                reconnectRequest.put("rows", rows);
 
                 sendRaw(reconnectRequest.toString());
 
@@ -465,6 +468,20 @@ public class NetworkClient {
                 sendRaw(request.toString());
             } catch (Exception e) {
                 Log.e(TAG, "Error sending change profile: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    public void sendLayoutChange(final int cols, final int rows) {
+        new Thread(() -> {
+            try {
+                JSONObject layoutReq = new JSONObject();
+                layoutReq.put("type", "LAYOUT_CHANGE");
+                layoutReq.put("cols", cols);
+                layoutReq.put("rows", rows);
+                sendRaw(layoutReq.toString());
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to send layout change: " + e.getMessage());
             }
         }).start();
     }

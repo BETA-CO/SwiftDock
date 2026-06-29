@@ -12,24 +12,32 @@
         android:focusable="false"
         android:padding="8dp">
 
-        <ImageView
-            android:id="@+id/btn_icon"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_gravity="center"
-            android:scaleType="fitCenter" />
+        <FrameLayout
+            android:id="@+id/btn_content_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center">
 
-        <TextView
-            android:id="@+id/btn_title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:textSize="20sp"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:visibility="gone" />
+            <ImageView
+                android:id="@+id/btn_icon"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/btn_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:textSize="20sp"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:visibility="gone" />
+
+        </FrameLayout>
 
     </FrameLayout>
 

@@ -15,8 +15,28 @@
         <DialogSelection />
       </SelectionState>
       <SelectionState runConfigName="main">
-        <option name="selectionMode" value="DROPDOWN" />
-        <DialogSelection />
+        <option name="selectionMode" value="DIALOG" />
+        <DropdownSelection timestamp="2026-06-29T11:11:37.461301300Z">
+          <Target type="DEFAULT_BOOT">
+            <handle>
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\rohit\.android\avd\Pixel_9_Pro_Fold.avd" />
+            </handle>
+          </Target>
+        </DropdownSelection>
+        <DialogSelection>
+          <targets>
+            <Target type="DEFAULT_BOOT">
+              <handle>
+                <DeviceId pluginId="PhysicalDevice" identifier="serial=RZ8N80JDFAN" />
+              </handle>
+            </Target>
+            <Target type="DEFAULT_BOOT">
+              <handle>
+                <DeviceId pluginId="PhysicalDevice" identifier="serial=499d489a" />
+              </handle>
+            </Target>
+          </targets>
+        </DialogSelection>
       </SelectionState>
     </selectionStates>
   </component>

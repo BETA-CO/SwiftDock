@@ -61,7 +61,7 @@
         android:layout_width="match_parent"
         android:layout_height="140dp"
         android:orientation="horizontal"
-        android:weightSum="4">
+        android:weightSum="3">
 
         <!-- Option 1: Change Name -->
         <LinearLayout
@@ -69,7 +69,7 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginEnd="4dp"
+            android:layout_marginEnd="8dp"
             android:orientation="vertical"
             android:gravity="center"
             android:padding="12dp"
@@ -110,8 +110,8 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
             android:orientation="vertical"
             android:gravity="center"
             android:padding="12dp"
@@ -146,54 +146,13 @@
                 android:gravity="center" />
         </LinearLayout>
 
-        <!-- Option 3: Pair New -->
-        <LinearLayout
-            android:id="@+id/option_pair_new"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:padding="12dp"
-            android:background="@drawable/dialog_option_bg"
-            android:clickable="true"
-            android:focusable="true">
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:src="@drawable/ic_link"
-                android:tint="#3B82F6"
-                android:layout_marginBottom="10dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Pair New"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:gravity="center" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Connect to PC"
-                android:textColor="#8E8E93"
-                android:textSize="10sp"
-                android:layout_marginTop="3dp"
-                android:gravity="center" />
-        </LinearLayout>
-
-        <!-- Option 4: Disconnect & Exit -->
+        <!-- Option 3: Disconnect & Exit -->
         <LinearLayout
             android:id="@+id/option_disconnect"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
+            android:layout_marginStart="8dp"
             android:orientation="vertical"
             android:gravity="center"
             android:padding="12dp"

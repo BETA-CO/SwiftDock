@@ -62,7 +62,7 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
         super.onViewCreated(view, savedInstanceState);
         
         // Force Landscape orientation during wizard connection
-        requireActivity().setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        requireActivity().setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
 
         // Bind layouts
         layoutReconnecting = view.findViewById(R.id.layout_reconnecting);
@@ -116,7 +116,10 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
                         btnRetryReconnect.setVisibility(View.GONE);
                         progressReconnect.setVisibility(View.VISIBLE);
 
-                        networkClient.connectAndAuthenticate(selectedIp, "0000", mobileName);
+                        boolean isTab = requireContext().getResources().getConfiguration().smallestScreenWidthDp >= 600;
+                        int cols = isTab ? 5 : 4;
+                        int rows = isTab ? 3 : 2;
+                        networkClient.connectAndAuthenticate(selectedIp, "0000", mobileName, cols, rows);
                     })
                     .setNegativeButton("Cancel", null)
                     .show();
@@ -128,11 +131,14 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
                 btnRetryReconnect.setVisibility(View.GONE);
                 progressReconnect.setVisibility(View.VISIBLE);
 
+                boolean isTab = requireContext().getResources().getConfiguration().smallestScreenWidthDp >= 600;
+                int cols = isTab ? 5 : 4;
+                int rows = isTab ? 3 : 2;
                 if (!TextUtils.isEmpty(discoveredIp)) {
-                    networkClient.connectAndAuthenticate(discoveredIp, "0000", mobileName);
+                    networkClient.connectAndAuthenticate(discoveredIp, "0000", mobileName, cols, rows);
                 } else if (!TextUtils.isEmpty(savedIp)) {
                     isAttemptingAutoReconnect = true;
-                    networkClient.reconnect(savedIp, savedToken, mobileName);
+                    networkClient.reconnect(savedIp, savedToken, mobileName, cols, rows);
                 }
             }
         });
