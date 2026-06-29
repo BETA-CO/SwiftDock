@@ -86,6 +86,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // FAB removed
+        checkForMobileUpdates();
     }
 
     @Override
@@ -117,5 +118,72 @@ public class MainActivity extends AppCompatActivity {
         NavController navController = navHostFragment.getNavController();
         return NavigationUI.navigateUp(navController, appBarConfiguration)
                 || super.onSupportNavigateUp();
+    }
+
+    private void checkForMobileUpdates() {
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+
+        executor.execute(() -> {
+            java.net.HttpURLConnection connection = null;
+            java.io.BufferedReader reader = null;
+            try {
+                java.net.URL url = new java.net.URL("https://raw.githubusercontent.com/BETA-CO/SwiftDock/main/update_mobile.json");
+                connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+
+                int responseCode = connection.getResponseCode();
+                if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                    java.io.InputStream in = connection.getInputStream();
+                    reader = new java.io.BufferedReader(new java.io.InputStreamReader(in));
+                    StringBuilder result = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        result.append(line);
+                    }
+
+                    org.json.JSONObject json = new org.json.JSONObject(result.toString());
+                    int onlineVersionCode = json.optInt("versionCode", 0);
+                    String onlineVersionName = json.optString("versionName", "");
+                    String apkUrl = json.optString("apkUrl", "");
+                    String changelog = json.optString("changelog", "");
+
+                    // Compare with current version
+                    int currentVersionCode = getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+
+                    if (onlineVersionCode > currentVersionCode) {
+                        handler.post(() -> showUpdatePrompt(onlineVersionName, apkUrl, changelog));
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                if (reader != null) {
+                    try { reader.close(); } catch (Exception ignored) {}
+                }
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        });
+    }
+
+    private void showUpdatePrompt(String versionName, String apkUrl, String changelog) {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Update Available")
+            .setMessage("A new version of SwiftDock (v" + versionName + ") is available.\n\nChangelog:\n" + changelog + "\n\nDo you want to download it now?")
+            .setPositiveButton("Update Now", (dialog, which) -> {
+                try {
+                    android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+                    intent.setData(android.net.Uri.parse(apkUrl));
+                    startActivity(intent);
+                } catch (Exception e) {
+                    android.widget.Toast.makeText(this, "Failed to open browser: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+                }
+            })
+            .setNegativeButton("Later", null)
+            .show();
     }
 }
