@@ -1,0 +1,6 @@
+{
+  "versionCode": 4,
+  "versionName": "1.1.3",
+  "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.1.3/app-release.apk",
+  "changelog": "Added horizontal swipe for tablets, touch slop fixes, and dynamic padding."
+}
