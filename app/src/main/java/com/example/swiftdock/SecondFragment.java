@@ -106,6 +106,9 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
                 updateDots(position);
+                if (networkClient.isConnected()) {
+                    networkClient.sendPageChange(position);
+                }
             }
         });
 

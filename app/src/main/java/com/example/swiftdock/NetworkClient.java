@@ -486,6 +486,19 @@ public class NetworkClient {
         }).start();
     }
 
+    public void sendPageChange(final int pageIndex) {
+        new Thread(() -> {
+            try {
+                JSONObject pageReq = new JSONObject();
+                pageReq.put("type", "PAGE_CHANGE");
+                pageReq.put("pageIndex", pageIndex);
+                sendRaw(pageReq.toString());
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to send page change: " + e.getMessage());
+            }
+        }).start();
+    }
+
     public void disconnect() {
         new Thread(this::closeTcpConnection).start();
     }
