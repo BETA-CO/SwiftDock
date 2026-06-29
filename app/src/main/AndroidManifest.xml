@@ -18,7 +18,7 @@
         android:theme="@style/Theme.SwiftDock">
         <activity
             android:name=".MainActivity"
-            android:exported="true"
+            android:exported="true" 
             android:theme="@style/Theme.SwiftDock"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:windowSoftInputMode="adjustResize">
