@@ -15,11 +15,11 @@
         <DialogSelection />
       </SelectionState>
       <SelectionState runConfigName="main">
-        <option name="selectionMode" value="DIALOG" />
-        <DropdownSelection timestamp="2026-06-29T11:11:37.461301300Z">
+        <option name="selectionMode" value="DROPDOWN" />
+        <DropdownSelection timestamp="2026-06-29T12:51:43.041400Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\rohit\.android\avd\Pixel_9_Pro_Fold.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\rohit\.android\avd\Medium_Tablet.avd" />
             </handle>
           </Target>
         </DropdownSelection>
