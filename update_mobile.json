@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "1.1.4",
-  "apkUrl": "https://github.com/BETA-CO/SwiftDock/raw/v1.1.4/release/app-release.apk",
-  "changelog": "Implement premium dark matte prompt and download progress layouts."
+  "versionCode": 6,
+  "versionName": "1.1.5",
+  "apkUrl": "https://github.com/BETA-CO/SwiftDock/raw/v1.1.5/release/app-release.apk",
+  "changelog": "Update custom app logo vectors and launcher icon background."
 }
