@@ -85,6 +85,19 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
+        // Clear update cache files on startup to free space after installation
+        try {
+            java.io.File cacheDir = getExternalCacheDir();
+            if (cacheDir != null) {
+                java.io.File residualApk = new java.io.File(cacheDir, "SwiftDockUpdate.apk");
+                if (residualApk.exists()) {
+                    residualApk.delete();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         // FAB removed
         checkForMobileUpdates();
     }
