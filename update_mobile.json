@@ -1,6 +1,6 @@
 {
-  "versionCode": 4,
-  "versionName": "1.1.3",
-  "apkUrl": "https://github.com/BETA-CO/SwiftDock/raw/v1.1.3/release/app-release.apk",
-  "changelog": "Added horizontal swipe for tablets, touch slop fixes, and dynamic padding."
+  "versionCode": 5,
+  "versionName": "1.1.4",
+  "apkUrl": "https://github.com/BETA-CO/SwiftDock/raw/v1.1.4/release/app-release.apk",
+  "changelog": "Implement premium dark matte prompt and download progress layouts."
 }
