@@ -1,6 +1,6 @@
 {
-  "versionCode": 6,
-  "versionName": "1.1.5",
-  "apkUrl": "https://github.com/BETA-CO/SwiftDock/raw/v1.1.5/release/app-release.apk",
-  "changelog": "Update custom app logo vectors and launcher icon background."
+  "versionCode": 7,
+  "versionName": "1.1.6",
+  "apkUrl": "https://github.com/BETA-CO/SwiftDock/raw/v1.1.6/release/app-release.apk",
+  "changelog": "Optimize launcher icon padding and scaling to prevent edge clipping on the home screen."
 }
