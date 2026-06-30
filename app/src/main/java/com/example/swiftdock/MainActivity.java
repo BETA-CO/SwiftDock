@@ -171,41 +171,47 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showUpdatePrompt(String versionName, String apkUrl, String changelog) {
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Update Available")
-            .setMessage("A new version of SwiftDock (v" + versionName + ") is available.\n\nChangelog:\n" + changelog + "\n\nDo you want to download and install it now?")
-            .setPositiveButton("Update Now", (dialog, which) -> downloadAndInstallApk(apkUrl))
-            .setNegativeButton("Later", null)
-            .show();
+        android.view.View dialogView = getLayoutInflater().inflate(R.layout.dialog_update_prompt, null);
+        
+        android.widget.TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
+        android.widget.TextView tvMessage = dialogView.findViewById(R.id.tv_dialog_message);
+        android.widget.Button btnLater = dialogView.findViewById(R.id.btn_dialog_later);
+        android.widget.Button btnUpdate = dialogView.findViewById(R.id.btn_dialog_update);
+
+        tvTitle.setText("Update Available");
+        tvMessage.setText("A new version of SwiftDock (v" + versionName + ") is available.\n\nChangelog:\n" + changelog + "\n\nDo you want to download and install it now?");
+
+        androidx.appcompat.app.AlertDialog alertDialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(true)
+            .create();
+
+        if (alertDialog.getWindow() != null) {
+            alertDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        btnLater.setOnClickListener(v -> alertDialog.dismiss());
+        btnUpdate.setOnClickListener(v -> {
+            alertDialog.dismiss();
+            downloadAndInstallApk(apkUrl);
+        });
+
+        alertDialog.show();
     }
 
     private void downloadAndInstallApk(String apkUrl) {
-        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
-        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-        layout.setPadding(50, 40, 50, 40);
-
-        android.widget.ProgressBar progressBar = new android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progressBar.setMax(100);
-        progressBar.setProgress(0);
-        progressBar.setIndeterminate(false);
-        progressBar.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-
-        android.widget.TextView tvProgress = new android.widget.TextView(this);
-        tvProgress.setText("0%");
-        tvProgress.setGravity(android.view.Gravity.RIGHT);
-        tvProgress.setPadding(0, 10, 0, 0);
-
-        layout.addView(progressBar);
-        layout.addView(tvProgress);
+        android.view.View dialogView = getLayoutInflater().inflate(R.layout.dialog_update_progress, null);
+        android.widget.ProgressBar progressBar = dialogView.findViewById(R.id.progress_bar_download);
+        android.widget.TextView tvProgress = dialogView.findViewById(R.id.tv_progress_percentage);
 
         androidx.appcompat.app.AlertDialog progressDialog = new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Downloading Update")
-                .setView(layout)
+                .setView(dialogView)
                 .setCancelable(false)
                 .create();
+
+        if (progressDialog.getWindow() != null) {
+            progressDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
 
         progressDialog.show();
 
