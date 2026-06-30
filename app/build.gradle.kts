@@ -14,8 +14,8 @@ android {
         applicationId = "com.example.swiftdock"
         minSdk = 29
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.1.6"
+        versionCode = 8
+        versionName = "1.1.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
