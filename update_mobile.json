@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.1.6",
-  "apkUrl": "https://github.com/BETA-CO/SwiftDock/raw/v1.1.6/release/app-release.apk",
-  "changelog": "Optimize launcher icon padding and scaling to prevent edge clipping on the home screen."
+  "versionCode": 8,
+  "versionName": "1.1.7",
+  "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.1.7/app-release.apk",
+  "changelog": "Admin Panel Testing"
 }
