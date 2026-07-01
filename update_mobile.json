@@ -1,6 +1,6 @@
 {
-  "versionCode": 8,
-  "versionName": "1.1.7",
-  "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.1.7/app-release.apk",
-  "changelog": "Admin Panel Testing"
+  "versionCode": 9,
+  "versionName": "1.1.8",
+  "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.1.8/app-release.apk",
+  "changelog": "Added Tab Switching for Application and URL's instead of opening the same application multiple times"
 }
