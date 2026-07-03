@@ -63,6 +63,7 @@ public class NetworkClient {
     private boolean isRunning = false;
     private final Handler mainHandler;
     private final List<NetworkListener> listeners = new ArrayList<>();
+    private String sessionToken;
 
     // Keep track of discovered server
     private String discoveredIp;
@@ -349,9 +350,10 @@ public class NetworkClient {
         new Thread(() -> {
             try {
                 closeTcpConnection();
+                sessionToken = null;
                 
                 tcpSocket = new Socket();
-                tcpSocket.connect(new InetSocketAddress(ip, discoveredPort), 4000);
+                tcpSocket.connect(new InetSocketAddress(ip, 19001), 4000);
                 tcpSocket.setSoTimeout(7000);
                 outputStream = tcpSocket.getOutputStream();
 
@@ -379,6 +381,7 @@ public class NetworkClient {
                 
                 if ("SUCCESS".equalsIgnoreCase(status)) {
                     String token = authResponse.optString("token");
+                    sessionToken = token;
                     notifyConnectionSuccess(token);
                     startSessionReader(reader);
                 } else {
@@ -403,9 +406,10 @@ public class NetworkClient {
         new Thread(() -> {
             try {
                 closeTcpConnection();
-
+                sessionToken = savedToken;
+ 
                 tcpSocket = new Socket();
-                tcpSocket.connect(new InetSocketAddress(ip, discoveredPort), 6000);
+                tcpSocket.connect(new InetSocketAddress(ip, 19001), 6000);
                 tcpSocket.setSoTimeout(7000);
                 outputStream = tcpSocket.getOutputStream();
 
@@ -427,10 +431,11 @@ public class NetworkClient {
                     closeTcpConnection();
                     return;
                 }
-
-                JSONObject authResponse = new JSONObject(responseLine);
+ 
+                String decrypted = decrypt(responseLine, sessionToken);
+                JSONObject authResponse = new JSONObject(decrypted);
                 String status = authResponse.optString("status");
-
+ 
                 if ("SUCCESS".equalsIgnoreCase(status)) {
                     notifyConnectionSuccess(savedToken);
                     startSessionReader(reader);
@@ -505,7 +510,11 @@ public class NetworkClient {
 
     private void sendRaw(String msg) throws Exception {
         if (outputStream != null) {
-            byte[] data = (msg + "\n").getBytes("UTF-8");
+            String payload = msg;
+            if (sessionToken != null && !sessionToken.isEmpty()) {
+                payload = encrypt(msg, sessionToken);
+            }
+            byte[] data = (payload + "\n").getBytes("UTF-8");
             outputStream.write(data);
             outputStream.flush();
         } else {
@@ -539,6 +548,7 @@ public class NetworkClient {
         }
         tcpSocket = null;
         outputStream = null;
+        sessionToken = null;
         cachedButtons.clear();
         notifyDisconnected();
     }
@@ -550,9 +560,15 @@ public class NetworkClient {
                 while (isRunning && tcpSocket != null && !tcpSocket.isClosed()) {
                     String line = reader.readLine();
                     if (line == null) break; // Disconnected
-
+ 
                     if (!line.trim().isEmpty()) {
-                        processIncomingMessage(line);
+                        String decrypted = line;
+                        if (sessionToken != null && !sessionToken.isEmpty()) {
+                            decrypted = decrypt(line, sessionToken);
+                        }
+                        if (decrypted != null && !decrypted.trim().isEmpty()) {
+                            processIncomingMessage(decrypted);
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -748,6 +764,67 @@ public class NetworkClient {
                     f.delete();
                 }
             }
+        }
+    }
+
+    // AES Cryptographic Helpers
+    private static byte[] deriveKey(String token) throws Exception {
+        java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+        return digest.digest(token.getBytes("UTF-8"));
+    }
+
+    private static String encrypt(String plainText, String token) {
+        if (plainText == null || plainText.isEmpty()) return "";
+        if (token == null || token.isEmpty()) return plainText;
+
+        try {
+            byte[] keyBytes = deriveKey(token);
+            javax.crypto.spec.SecretKeySpec secretKey = new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
+
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding");
+            byte[] iv = new byte[16];
+            new java.security.SecureRandom().nextBytes(iv);
+            javax.crypto.spec.IvParameterSpec ivSpec = new javax.crypto.spec.IvParameterSpec(iv);
+
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKey, ivSpec);
+            byte[] encrypted = cipher.doFinal(plainText.getBytes("UTF-8"));
+
+            byte[] combined = new byte[iv.length + encrypted.length];
+            System.arraycopy(iv, 0, combined, 0, iv.length);
+            System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
+
+            return android.util.Base64.encodeToString(combined, android.util.Base64.NO_WRAP);
+        } catch (Exception e) {
+            Log.e(TAG, "Encryption error: " + e.getMessage());
+            return plainText;
+        }
+    }
+
+    private static String decrypt(String cipherText, String token) {
+        if (cipherText == null || cipherText.isEmpty()) return "";
+        if (token == null || token.isEmpty()) return cipherText;
+
+        try {
+            byte[] combined = android.util.Base64.decode(cipherText, android.util.Base64.NO_WRAP);
+            if (combined.length < 16) return cipherText;
+
+            byte[] iv = new byte[16];
+            byte[] encrypted = new byte[combined.length - 16];
+            System.arraycopy(combined, 0, iv, 0, 16);
+            System.arraycopy(combined, 16, encrypted, 0, encrypted.length);
+
+            byte[] keyBytes = deriveKey(token);
+            javax.crypto.spec.SecretKeySpec secretKey = new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
+            javax.crypto.spec.IvParameterSpec ivSpec = new javax.crypto.spec.IvParameterSpec(iv);
+
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, secretKey, ivSpec);
+
+            byte[] decryptedBytes = cipher.doFinal(encrypted);
+            return new String(decryptedBytes, "UTF-8");
+        } catch (Exception e) {
+            Log.e(TAG, "Decryption error: " + e.getMessage());
+            return cipherText;
         }
     }
 }
