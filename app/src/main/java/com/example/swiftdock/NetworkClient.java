@@ -226,54 +226,59 @@ public class NetworkClient {
 
         new Thread(() -> {
             Log.d(TAG, "Starting parallel subnet scan on subnet: " + subnet);
-            scanExecutor = Executors.newFixedThreadPool(30);
-
+            final java.util.concurrent.ExecutorService localExecutor = Executors.newFixedThreadPool(30);
+            scanExecutor = localExecutor;
+ 
             for (int i = 1; i <= 254; i++) {
                 final String host = subnet + i;
-                scanExecutor.execute(() -> {
-                    Socket socket = null;
-                    try {
-                        socket = new Socket();
-                        socket.connect(new InetSocketAddress(host, 19001), 800); // 800ms TCP connection check
-                        
-                        Log.d(TAG, "Found server via TCP scan at " + host);
-                        
-                        // Query the hostname from the server using the DISCOVER command
-                        OutputStream out = socket.getOutputStream();
-                        JSONObject discoverReq = new JSONObject();
-                        discoverReq.put("type", "DISCOVER");
-                        discoverReq.put("deviceName", "DiscoveryClient");
-                        out.write((discoverReq.toString() + "\n").getBytes("UTF-8"));
-                        out.flush();
-                        
-                        BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
-                        String responseLine = reader.readLine();
-                        String hostname = "Computer";
-                        if (responseLine != null && !responseLine.trim().isEmpty()) {
-                            JSONObject responseObj = new JSONObject(responseLine);
-                            if ("DISCOVER_RESPONSE".equalsIgnoreCase(responseObj.optString("type"))) {
-                                hostname = responseObj.optString("deviceName", "Computer");
+                try {
+                    localExecutor.execute(() -> {
+                        Socket socket = null;
+                        try {
+                            socket = new Socket();
+                            socket.connect(new InetSocketAddress(host, 19001), 800); // 800ms TCP connection check
+                            
+                            Log.d(TAG, "Found server via TCP scan at " + host);
+                            
+                            // Query the hostname from the server using the DISCOVER command
+                            OutputStream out = socket.getOutputStream();
+                            JSONObject discoverReq = new JSONObject();
+                            discoverReq.put("type", "DISCOVER");
+                            discoverReq.put("deviceName", "DiscoveryClient");
+                            out.write((discoverReq.toString() + "\n").getBytes("UTF-8"));
+                            out.flush();
+                            
+                            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
+                            String responseLine = reader.readLine();
+                            String hostname = "Computer";
+                            if (responseLine != null && !responseLine.trim().isEmpty()) {
+                                JSONObject responseObj = new JSONObject(responseLine);
+                                if ("DISCOVER_RESPONSE".equalsIgnoreCase(responseObj.optString("type"))) {
+                                    hostname = responseObj.optString("deviceName", "Computer");
+                                }
+                            }
+                            
+                            discoveredIp = host;
+                            discoveredPort = 19001;
+                            discoveredHostname = hostname;
+                            
+                            notifyServerDiscovered(host, 19001, discoveredHostname);
+                        } catch (Exception e) {
+                            // Port closed or unreachable
+                        } finally {
+                            if (socket != null) {
+                                try { socket.close(); } catch (Exception e) {}
                             }
                         }
-                        
-                        discoveredIp = host;
-                        discoveredPort = 19001;
-                        discoveredHostname = hostname;
-                        
-                        notifyServerDiscovered(host, 19001, discoveredHostname);
-                    } catch (Exception e) {
-                        // Port closed or unreachable
-                    } finally {
-                        if (socket != null) {
-                            try { socket.close(); } catch (Exception e) {}
-                        }
-                    }
-                });
+                    });
+                } catch (java.util.concurrent.RejectedExecutionException e) {
+                    Log.d(TAG, "Scan task execution rejected (executor shutdown): " + e.getMessage());
+                }
             }
-
-            scanExecutor.shutdown();
+ 
+            localExecutor.shutdown();
             try {
-                scanExecutor.awaitTermination(6, TimeUnit.SECONDS);
+                localExecutor.awaitTermination(6, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Log.e(TAG, "Subnet scan interrupted");
             }
