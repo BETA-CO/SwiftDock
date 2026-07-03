@@ -388,7 +388,7 @@ public class NetworkClient {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "TCP connection error: " + e.getMessage());
-                notifyConnectionFailed("Failed to connect: " + e.getMessage());
+                notifyConnectionFailed(getCleanErrorMessage(e));
                 closeTcpConnection();
             }
         }).start();
@@ -405,7 +405,7 @@ public class NetworkClient {
                 closeTcpConnection();
 
                 tcpSocket = new Socket();
-                tcpSocket.connect(new InetSocketAddress(ip, discoveredPort), 3000);
+                tcpSocket.connect(new InetSocketAddress(ip, discoveredPort), 6000);
                 tcpSocket.setSoTimeout(7000);
                 outputStream = tcpSocket.getOutputStream();
 
@@ -440,7 +440,7 @@ public class NetworkClient {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Auto-reconnect error: " + e.getMessage());
-                notifyConnectionFailed("Could not connect automatically: " + e.getMessage());
+                notifyConnectionFailed(getCleanErrorMessage(e));
                 closeTcpConnection();
             }
         }).start();
@@ -706,5 +706,48 @@ public class NetworkClient {
                 }
             }
         });
+    }
+
+    private String getCleanErrorMessage(Exception e) {
+        if (e instanceof java.net.SocketTimeoutException) {
+            return "Connection timed out. Check if your PC is on and Swift Dock is running.";
+        }
+        String msg = e.getMessage();
+        if (msg == null) return "Failed to connect to the computer.";
+        if (msg.contains("EHOSTUNREACH") || msg.contains("No route to host")) {
+            return "Host unreachable. Ensure your phone and PC are on the same Wi-Fi network.";
+        }
+        if (msg.contains("ECONNREFUSED") || msg.contains("Connection refused")) {
+            return "Connection refused. Ensure Swift Dock is open on your PC and not blocked by a firewall.";
+        }
+        if (msg.contains("ENETUNREACH")) {
+            return "Network is unreachable. Check your phone's Wi-Fi connection.";
+        }
+        return "Could not connect to the computer. Please verify settings.";
+    }
+
+    public static boolean clearAppCache(android.content.Context context) {
+        try {
+            deleteDirContent(context.getCacheDir());
+            deleteDirContent(context.getExternalCacheDir());
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Error clearing cache: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static void deleteDirContent(java.io.File dir) {
+        if (dir != null && dir.isDirectory()) {
+            java.io.File[] files = dir.listFiles();
+            if (files != null) {
+                for (java.io.File f : files) {
+                    if (f.isDirectory()) {
+                        deleteDirContent(f);
+                    }
+                    f.delete();
+                }
+            }
+        }
     }
 }

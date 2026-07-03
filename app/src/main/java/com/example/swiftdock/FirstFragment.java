@@ -238,7 +238,9 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
     public void onConnectionSuccess(String token) {
         if (!isAdded()) return;
  
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        Context context = getContext();
+        if (context == null) return;
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String ip = discoveredIp != null ? discoveredIp : prefs.getString(KEY_PAIRED_IP, "");
         String hostname = networkClient.getDiscoveredHostname();
         if (TextUtils.isEmpty(hostname)) {
@@ -266,7 +268,10 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
         isConnecting = false;
         isAttemptingAutoReconnect = false;
  
-        Toast.makeText(getContext(), reason, Toast.LENGTH_SHORT).show();
+        Context context = getContext();
+        if (context != null) {
+            Toast.makeText(context, reason, Toast.LENGTH_SHORT).show();
+        }
  
         showPanel(layoutReconnectOptions);
         
