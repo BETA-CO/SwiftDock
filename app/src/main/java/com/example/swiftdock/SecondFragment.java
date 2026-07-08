@@ -50,8 +50,10 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
         @Override
         public void run() {
             if (!isAdded() || isUserDisconnecting) return;
+            Context context = getContext();
+            if (context == null) return;
             if (!networkClient.isConnected()) {
-                SharedPreferences prefs = requireContext().getSharedPreferences("SwiftDockPrefs", Context.MODE_PRIVATE);
+                SharedPreferences prefs = context.getSharedPreferences("SwiftDockPrefs", Context.MODE_PRIVATE);
                 String savedIp = prefs.getString("paired_ip", "");
                 String savedToken = prefs.getString("paired_token", "");
                 String mobileName = prefs.getString("mobile_name", android.os.Build.MODEL);
@@ -206,6 +208,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        reconnectHandler.removeCallbacks(reconnectRunnable);
         networkClient.stopDiscovery();
         networkClient.removeListener(this);
     }
@@ -215,7 +218,9 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
     public void onServerDiscovered(String ip, int port, String hostname) {
         if (!isAdded()) return;
         if (isReconnecting && !networkClient.isConnected()) {
-            SharedPreferences prefs = requireContext().getSharedPreferences("SwiftDockPrefs", Context.MODE_PRIVATE);
+            Context context = getContext();
+            if (context == null) return;
+            SharedPreferences prefs = context.getSharedPreferences("SwiftDockPrefs", Context.MODE_PRIVATE);
             String savedToken = prefs.getString("paired_token", "");
             String mobileName = prefs.getString("mobile_name", android.os.Build.MODEL);
             boolean isLandscape = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
@@ -258,7 +263,9 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             if (layoutReconnectingOverlay != null) {
                 layoutReconnectingOverlay.setVisibility(View.VISIBLE);
             }
-            networkClient.startDiscovery(requireContext());
+            Context context = getContext();
+            if (context == null) return;
+            networkClient.startDiscovery(context);
             reconnectHandler.removeCallbacks(reconnectRunnable);
             reconnectHandler.post(reconnectRunnable);
         }
@@ -921,6 +928,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
 
         View btnChangeName = dialogView.findViewById(R.id.option_change_name);
         View btnChangeProfile = dialogView.findViewById(R.id.option_change_profile);
+        View btnClearCache = dialogView.findViewById(R.id.option_clear_cache);
         View btnDisconnect = dialogView.findViewById(R.id.option_disconnect);
         View btnCancel = dialogView.findViewById(R.id.option_cancel);
 
@@ -955,7 +963,20 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
             showChangeProfileDialog();
         });
 
-
+        if (btnClearCache != null) {
+            btnClearCache.setOnClickListener(v -> {
+                dialog.dismiss();
+                Context context = getContext();
+                if (context != null) {
+                    boolean success = NetworkClient.clearAppCache(context);
+                    if (success) {
+                        Toast.makeText(context, "Cache cleared successfully!", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(context, "Failed to clear cache.", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
 
         btnDisconnect.setOnClickListener(v -> {
             dialog.dismiss();

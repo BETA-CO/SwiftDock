@@ -163,8 +163,8 @@ public class MainActivity extends AppCompatActivity {
                     String apkUrl = json.optString("apkUrl", "");
                     String changelog = json.optString("changelog", "");
 
-                    // Compare with current version
-                    int currentVersionCode = getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+                    // Compare with current version using BuildConfig for reliability
+                    int currentVersionCode = BuildConfig.VERSION_CODE;
 
                     if (onlineVersionCode > currentVersionCode) {
                         handler.post(() -> showUpdatePrompt(onlineVersionName, apkUrl, changelog));

@@ -1,6 +1,6 @@
 {
   "versionCode": 11,
-  "versionName": "1.1.9",
-  "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.1.9/app-release.apk",
-  "changelog": "Added Profile Buttons, Mobile Application Crash Solution, Connection Encryption,"
+  "versionName": "1.2.0",
+  "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.2.0/app-release.apk",
+  "changelog": "Optimized startup speed, added About SwiftDock info panel, and fixed update prompt checks."
 }

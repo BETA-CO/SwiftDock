@@ -63,6 +63,7 @@ public class NetworkClient {
     private boolean isRunning = false;
     private final Handler mainHandler;
     private final List<NetworkListener> listeners = new ArrayList<>();
+    private String sessionToken;
 
     // Keep track of discovered server
     private String discoveredIp;
@@ -225,54 +226,59 @@ public class NetworkClient {
 
         new Thread(() -> {
             Log.d(TAG, "Starting parallel subnet scan on subnet: " + subnet);
-            scanExecutor = Executors.newFixedThreadPool(30);
-
+            final java.util.concurrent.ExecutorService localExecutor = Executors.newFixedThreadPool(30);
+            scanExecutor = localExecutor;
+ 
             for (int i = 1; i <= 254; i++) {
                 final String host = subnet + i;
-                scanExecutor.execute(() -> {
-                    Socket socket = null;
-                    try {
-                        socket = new Socket();
-                        socket.connect(new InetSocketAddress(host, 19001), 800); // 800ms TCP connection check
-                        
-                        Log.d(TAG, "Found server via TCP scan at " + host);
-                        
-                        // Query the hostname from the server using the DISCOVER command
-                        OutputStream out = socket.getOutputStream();
-                        JSONObject discoverReq = new JSONObject();
-                        discoverReq.put("type", "DISCOVER");
-                        discoverReq.put("deviceName", "DiscoveryClient");
-                        out.write((discoverReq.toString() + "\n").getBytes("UTF-8"));
-                        out.flush();
-                        
-                        BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
-                        String responseLine = reader.readLine();
-                        String hostname = "Computer";
-                        if (responseLine != null && !responseLine.trim().isEmpty()) {
-                            JSONObject responseObj = new JSONObject(responseLine);
-                            if ("DISCOVER_RESPONSE".equalsIgnoreCase(responseObj.optString("type"))) {
-                                hostname = responseObj.optString("deviceName", "Computer");
+                try {
+                    localExecutor.execute(() -> {
+                        Socket socket = null;
+                        try {
+                            socket = new Socket();
+                            socket.connect(new InetSocketAddress(host, 19001), 800); // 800ms TCP connection check
+                            
+                            Log.d(TAG, "Found server via TCP scan at " + host);
+                            
+                            // Query the hostname from the server using the DISCOVER command
+                            OutputStream out = socket.getOutputStream();
+                            JSONObject discoverReq = new JSONObject();
+                            discoverReq.put("type", "DISCOVER");
+                            discoverReq.put("deviceName", "DiscoveryClient");
+                            out.write((discoverReq.toString() + "\n").getBytes("UTF-8"));
+                            out.flush();
+                            
+                            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
+                            String responseLine = reader.readLine();
+                            String hostname = "Computer";
+                            if (responseLine != null && !responseLine.trim().isEmpty()) {
+                                JSONObject responseObj = new JSONObject(responseLine);
+                                if ("DISCOVER_RESPONSE".equalsIgnoreCase(responseObj.optString("type"))) {
+                                    hostname = responseObj.optString("deviceName", "Computer");
+                                }
+                            }
+                            
+                            discoveredIp = host;
+                            discoveredPort = 19001;
+                            discoveredHostname = hostname;
+                            
+                            notifyServerDiscovered(host, 19001, discoveredHostname);
+                        } catch (Exception e) {
+                            // Port closed or unreachable
+                        } finally {
+                            if (socket != null) {
+                                try { socket.close(); } catch (Exception e) {}
                             }
                         }
-                        
-                        discoveredIp = host;
-                        discoveredPort = 19001;
-                        discoveredHostname = hostname;
-                        
-                        notifyServerDiscovered(host, 19001, discoveredHostname);
-                    } catch (Exception e) {
-                        // Port closed or unreachable
-                    } finally {
-                        if (socket != null) {
-                            try { socket.close(); } catch (Exception e) {}
-                        }
-                    }
-                });
+                    });
+                } catch (java.util.concurrent.RejectedExecutionException e) {
+                    Log.d(TAG, "Scan task execution rejected (executor shutdown): " + e.getMessage());
+                }
             }
-
-            scanExecutor.shutdown();
+ 
+            localExecutor.shutdown();
             try {
-                scanExecutor.awaitTermination(6, TimeUnit.SECONDS);
+                localExecutor.awaitTermination(6, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Log.e(TAG, "Subnet scan interrupted");
             }
@@ -349,9 +355,10 @@ public class NetworkClient {
         new Thread(() -> {
             try {
                 closeTcpConnection();
+                sessionToken = null;
                 
                 tcpSocket = new Socket();
-                tcpSocket.connect(new InetSocketAddress(ip, discoveredPort), 4000);
+                tcpSocket.connect(new InetSocketAddress(ip, 19001), 4000);
                 tcpSocket.setSoTimeout(7000);
                 outputStream = tcpSocket.getOutputStream();
 
@@ -379,6 +386,7 @@ public class NetworkClient {
                 
                 if ("SUCCESS".equalsIgnoreCase(status)) {
                     String token = authResponse.optString("token");
+                    sessionToken = token;
                     notifyConnectionSuccess(token);
                     startSessionReader(reader);
                 } else {
@@ -388,7 +396,7 @@ public class NetworkClient {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "TCP connection error: " + e.getMessage());
-                notifyConnectionFailed("Failed to connect: " + e.getMessage());
+                notifyConnectionFailed(getCleanErrorMessage(e));
                 closeTcpConnection();
             }
         }).start();
@@ -403,9 +411,10 @@ public class NetworkClient {
         new Thread(() -> {
             try {
                 closeTcpConnection();
-
+                sessionToken = savedToken;
+ 
                 tcpSocket = new Socket();
-                tcpSocket.connect(new InetSocketAddress(ip, discoveredPort), 3000);
+                tcpSocket.connect(new InetSocketAddress(ip, 19001), 6000);
                 tcpSocket.setSoTimeout(7000);
                 outputStream = tcpSocket.getOutputStream();
 
@@ -427,10 +436,11 @@ public class NetworkClient {
                     closeTcpConnection();
                     return;
                 }
-
-                JSONObject authResponse = new JSONObject(responseLine);
+ 
+                String decrypted = decrypt(responseLine, sessionToken);
+                JSONObject authResponse = new JSONObject(decrypted);
                 String status = authResponse.optString("status");
-
+ 
                 if ("SUCCESS".equalsIgnoreCase(status)) {
                     notifyConnectionSuccess(savedToken);
                     startSessionReader(reader);
@@ -440,7 +450,7 @@ public class NetworkClient {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Auto-reconnect error: " + e.getMessage());
-                notifyConnectionFailed("Could not connect automatically: " + e.getMessage());
+                notifyConnectionFailed(getCleanErrorMessage(e));
                 closeTcpConnection();
             }
         }).start();
@@ -505,7 +515,11 @@ public class NetworkClient {
 
     private void sendRaw(String msg) throws Exception {
         if (outputStream != null) {
-            byte[] data = (msg + "\n").getBytes("UTF-8");
+            String payload = msg;
+            if (sessionToken != null && !sessionToken.isEmpty()) {
+                payload = encrypt(msg, sessionToken);
+            }
+            byte[] data = (payload + "\n").getBytes("UTF-8");
             outputStream.write(data);
             outputStream.flush();
         } else {
@@ -539,6 +553,7 @@ public class NetworkClient {
         }
         tcpSocket = null;
         outputStream = null;
+        sessionToken = null;
         cachedButtons.clear();
         notifyDisconnected();
     }
@@ -550,9 +565,15 @@ public class NetworkClient {
                 while (isRunning && tcpSocket != null && !tcpSocket.isClosed()) {
                     String line = reader.readLine();
                     if (line == null) break; // Disconnected
-
+ 
                     if (!line.trim().isEmpty()) {
-                        processIncomingMessage(line);
+                        String decrypted = line;
+                        if (sessionToken != null && !sessionToken.isEmpty()) {
+                            decrypted = decrypt(line, sessionToken);
+                        }
+                        if (decrypted != null && !decrypted.trim().isEmpty()) {
+                            processIncomingMessage(decrypted);
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -706,5 +727,109 @@ public class NetworkClient {
                 }
             }
         });
+    }
+
+    private String getCleanErrorMessage(Exception e) {
+        if (e instanceof java.net.SocketTimeoutException) {
+            return "Connection timed out. Check if your PC is on and Swift Dock is running.";
+        }
+        String msg = e.getMessage();
+        if (msg == null) return "Failed to connect to the computer.";
+        if (msg.contains("EHOSTUNREACH") || msg.contains("No route to host")) {
+            return "Host unreachable. Ensure your phone and PC are on the same Wi-Fi network.";
+        }
+        if (msg.contains("ECONNREFUSED") || msg.contains("Connection refused")) {
+            return "Connection refused. Ensure Swift Dock is open on your PC and not blocked by a firewall.";
+        }
+        if (msg.contains("ENETUNREACH")) {
+            return "Network is unreachable. Check your phone's Wi-Fi connection.";
+        }
+        return "Could not connect to the computer. Please verify settings.";
+    }
+
+    public static boolean clearAppCache(android.content.Context context) {
+        try {
+            deleteDirContent(context.getCacheDir());
+            deleteDirContent(context.getExternalCacheDir());
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Error clearing cache: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static void deleteDirContent(java.io.File dir) {
+        if (dir != null && dir.isDirectory()) {
+            java.io.File[] files = dir.listFiles();
+            if (files != null) {
+                for (java.io.File f : files) {
+                    if (f.isDirectory()) {
+                        deleteDirContent(f);
+                    }
+                    f.delete();
+                }
+            }
+        }
+    }
+
+    // AES Cryptographic Helpers
+    private static byte[] deriveKey(String token) throws Exception {
+        java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+        return digest.digest(token.getBytes("UTF-8"));
+    }
+
+    private static String encrypt(String plainText, String token) {
+        if (plainText == null || plainText.isEmpty()) return "";
+        if (token == null || token.isEmpty()) return plainText;
+
+        try {
+            byte[] keyBytes = deriveKey(token);
+            javax.crypto.spec.SecretKeySpec secretKey = new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
+
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding");
+            byte[] iv = new byte[16];
+            new java.security.SecureRandom().nextBytes(iv);
+            javax.crypto.spec.IvParameterSpec ivSpec = new javax.crypto.spec.IvParameterSpec(iv);
+
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKey, ivSpec);
+            byte[] encrypted = cipher.doFinal(plainText.getBytes("UTF-8"));
+
+            byte[] combined = new byte[iv.length + encrypted.length];
+            System.arraycopy(iv, 0, combined, 0, iv.length);
+            System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
+
+            return android.util.Base64.encodeToString(combined, android.util.Base64.NO_WRAP);
+        } catch (Exception e) {
+            Log.e(TAG, "Encryption error: " + e.getMessage());
+            return plainText;
+        }
+    }
+
+    private static String decrypt(String cipherText, String token) {
+        if (cipherText == null || cipherText.isEmpty()) return "";
+        if (token == null || token.isEmpty()) return cipherText;
+
+        try {
+            byte[] combined = android.util.Base64.decode(cipherText, android.util.Base64.NO_WRAP);
+            if (combined.length < 16) return cipherText;
+
+            byte[] iv = new byte[16];
+            byte[] encrypted = new byte[combined.length - 16];
+            System.arraycopy(combined, 0, iv, 0, 16);
+            System.arraycopy(combined, 16, encrypted, 0, encrypted.length);
+
+            byte[] keyBytes = deriveKey(token);
+            javax.crypto.spec.SecretKeySpec secretKey = new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
+            javax.crypto.spec.IvParameterSpec ivSpec = new javax.crypto.spec.IvParameterSpec(iv);
+
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, secretKey, ivSpec);
+
+            byte[] decryptedBytes = cipher.doFinal(encrypted);
+            return new String(decryptedBytes, "UTF-8");
+        } catch (Exception e) {
+            Log.e(TAG, "Decryption error: " + e.getMessage());
+            return cipherText;
+        }
     }
 }
