@@ -1,5 +1,5 @@
 {
-  "versionCode": 11,
+  "versionCode": 12,
   "versionName": "1.2.0",
   "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.2.0/app-release.apk",
   "changelog": "Optimized startup speed, added About SwiftDock info panel, and fixed update prompt checks."
