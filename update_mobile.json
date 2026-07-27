@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "versionName": "1.2.0",
-  "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.2.0/app-release.apk",
-  "changelog": "Optimized startup speed, added About SwiftDock info panel, and fixed update prompt checks."
+  "versionCode": 13,
+  "versionName": "1.2.1",
+  "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.2.1/app-release.apk",
+  "changelog": "Added keep-screen-awake mode, profile sharing support, Settings page with auto-start toggle, and performance improvements."
 }
