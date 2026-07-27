@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "versionName": "1.2.0",
-  "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.2.0/app-release.apk",
-  "changelog": "Mobile Application Updates bug fixed.\nDesktop Fast start up.\nAbout Swift Dock Dialog added."
+  "versionCode": 13,
+  "versionName": "1.2.1",
+  "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.2.1/app-release.apk",
+  "changelog": "Profile Export & Import: Right-click any page and select 'Export Profile' to save a .swiftdock file. Click 'Import' in the sidebar to load shared profile files.\nSettings Panel: Added a dedicated Settings button in the sidebar. Includes Device Name customization and 'Run SwiftDock on Windows Startup' toggle.\nClean UI: Fixed Profile sub-tabs layout so it displays below category selectors. Updated Import button icon and renamed context menu item to 'Export Profile'.\nRemoved Macro Feature: Completely removed legacy Macro tab and backend execution logic."
 }
