@@ -1,6 +1,6 @@
 {
   "versionCode": 13,
   "versionName": "1.2.1",
-  "apkUrl": "https://github.com/BETA-CO/SwiftDock/releases/download/v1.2.1/app-release.apk",
+  "apkUrl": "https://raw.githubusercontent.com/BETA-CO/SwiftDock/main/release/app-release.apk",
   "changelog": "Added keep-screen-awake mode, profile sharing support, performance and connection stability improvements."
 }

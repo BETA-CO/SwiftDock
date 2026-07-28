@@ -240,12 +240,30 @@ public class MainActivity extends AppCompatActivity {
             try {
                 java.net.URL url = new java.net.URL(apkUrl);
                 connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.setInstanceFollowRedirects(true);
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(15000);
+
+                int status = connection.getResponseCode();
+                if (status == java.net.HttpURLConnection.HTTP_MOVED_TEMP || status == java.net.HttpURLConnection.HTTP_MOVED_PERM || status == java.net.HttpURLConnection.HTTP_SEE_OTHER || status == 307 || status == 308) {
+                    String redirectUrl = connection.getHeaderField("Location");
+                    if (redirectUrl != null && !redirectUrl.isEmpty()) {
+                        connection.disconnect();
+                        url = new java.net.URL(redirectUrl);
+                        connection = (java.net.HttpURLConnection) url.openConnection();
+                        connection.setConnectTimeout(10000);
+                        connection.setReadTimeout(15000);
+                    }
+                }
                 connection.connect();
 
                 int fileLength = connection.getContentLength();
                 input = connection.getInputStream();
 
                 apkFile = new java.io.File(getExternalCacheDir(), "SwiftDockUpdate.apk");
+                if (apkFile.exists()) {
+                    apkFile.delete();
+                }
                 output = new java.io.FileOutputStream(apkFile);
 
                 byte[] data = new byte[8192];
