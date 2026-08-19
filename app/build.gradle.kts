@@ -14,18 +14,25 @@ android {
         applicationId = "com.example.swiftdock"
         minSdk = 29
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.2.1"
+        versionCode = 14
+        versionName = "1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            isDebuggable = true
+            isMinifyEnabled = false
+        }
         release {
             signingConfig = signingConfigs.getByName("debug")
-            optimization {
-                enable = false
-            }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     compileOptions {
@@ -45,6 +52,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.navigation.fragment)
     implementation(libs.navigation.ui)
+    implementation("androidx.biometric:biometric:1.2.0-alpha05")
     testImplementation(libs.junit)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.ext.junit)

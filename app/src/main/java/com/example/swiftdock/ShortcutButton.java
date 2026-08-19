@@ -9,6 +9,16 @@ public class ShortcutButton implements Serializable {
     private String icon;
     private String actionType;
     private String actionData;
+    public ShortcutButton() {}
+
+    public ShortcutButton(String id, String title, String icon, String actionType, String actionData, String color) {
+        this.id = id;
+        this.title = title;
+        this.icon = icon;
+        this.actionType = actionType;
+        this.actionData = actionData;
+        this.color = color;
+    }
 
     // Getters and Setters
     public String getId() { return id; }

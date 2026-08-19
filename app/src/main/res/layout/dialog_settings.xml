@@ -1,247 +1,270 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="560dp"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="24dp"
-    android:background="@drawable/card_background"
-    android:layout_gravity="center">
+    android:overScrollMode="never"
+    android:scrollbars="none"
+    android:fillViewport="true">
 
-    <!-- Header layout with Title, Subtitle, and Close Button -->
-    <RelativeLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="20dp">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_alignParentStart="true"
-            android:layout_centerVertical="true">
-
-            <TextView
-                android:id="@+id/dialog_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="System Settings"
-                android:textColor="#FFFFFF"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/dialog_subtitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Configure connection properties and device details"
-                android:textColor="#8E8E93"
-                android:textSize="12sp"
-                android:layout_marginTop="2dp" />
-        </LinearLayout>
-
-        <!-- Close button at the top-right -->
-        <ImageView
-            android:id="@+id/option_cancel"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:background="@drawable/close_button_bg"
-            android:src="@drawable/ic_close"
-            android:scaleType="centerInside"
-            android:padding="8dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:contentDescription="Close Settings" />
-
-    </RelativeLayout>
-
-    <!-- Grid of Options Container -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:background="@drawable/card_background"
+        android:layout_gravity="center">
 
-        <!-- Row 1: Name and Profile -->
-        <LinearLayout
+        <!-- Header layout with Title, Subtitle, and Close Button -->
+        <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="120dp"
-            android:orientation="horizontal"
-            android:weightSum="2"
+            android:layout_height="wrap_content"
             android:layout_marginBottom="12dp">
 
-            <!-- Option 1: Change Name -->
             <LinearLayout
-                android:id="@+id/option_change_name"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:gravity="center"
-                android:padding="12dp"
-                android:background="@drawable/dialog_option_bg"
-                android:clickable="true"
-                android:focusable="true">
-
-                <ImageView
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:src="@drawable/ic_edit"
-                    android:tint="#8B5CF6"
-                    android:layout_marginBottom="8dp" />
+                android:layout_alignParentStart="true"
+                android:layout_toStartOf="@id/option_cancel"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="8dp">
 
                 <TextView
+                    android:id="@+id/dialog_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Device Name"
+                    android:text="System Settings"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:gravity="center" />
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/tv_device_name_summary"
+                    android:id="@+id/dialog_subtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Rename on network"
+                    android:text="Configure connection properties and device details"
                     android:textColor="#8E8E93"
-                    android:textSize="10sp"
-                    android:layout_marginTop="3dp"
-                    android:gravity="center" />
+                    android:textSize="11sp"
+                    android:layout_marginTop="2dp" />
             </LinearLayout>
 
-            <!-- Option 2: Change Profile -->
-            <LinearLayout
-                android:id="@+id/option_change_profile"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_marginStart="6dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="12dp"
-                android:background="@drawable/dialog_option_bg"
+            <!-- Close button at the top-right -->
+            <ImageView
+                android:id="@+id/option_cancel"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="@drawable/close_button_bg"
+                android:src="@drawable/ic_close"
+                android:scaleType="centerInside"
+                android:padding="6dp"
                 android:clickable="true"
-                android:focusable="true">
+                android:focusable="true"
+                android:contentDescription="Close Settings" />
 
-                <ImageView
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:src="@drawable/ic_folder"
-                    android:tint="#10B981"
-                    android:layout_marginBottom="8dp" />
+        </RelativeLayout>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Profile"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:gravity="center" />
-
-                <TextView
-                    android:id="@+id/tv_profile_summary"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Switch active profile"
-                    android:textColor="#8E8E93"
-                    android:textSize="10sp"
-                    android:layout_marginTop="3dp"
-                    android:gravity="center" />
-            </LinearLayout>
-
-        </LinearLayout>
-
-        <!-- Row 2: Clear Cache and Disconnect -->
+        <!-- Grid of Options Container -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="120dp"
-            android:orientation="horizontal"
-            android:weightSum="2">
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
-            <!-- Option 3: Clear Cache -->
+            <!-- Row 1: Name and Profile -->
             <LinearLayout
-                android:id="@+id/option_clear_cache"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="12dp"
-                android:background="@drawable/dialog_option_bg"
-                android:clickable="true"
-                android:focusable="true">
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2"
+                android:layout_marginBottom="8dp">
 
-                <ImageView
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:src="@drawable/ic_restart"
-                    android:tint="#F59E0B"
-                    android:layout_marginBottom="8dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
+                <!-- Option 1: Change Name -->
+                <LinearLayout
+                    android:id="@+id/option_change_name"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Clear Cache"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:gravity="center" />
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:minHeight="85dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="10dp"
+                    android:background="@drawable/dialog_option_bg"
+                    android:clickable="true"
+                    android:focusable="true">
 
-                <TextView
-                    android:layout_width="wrap_content"
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_edit"
+                        android:tint="#8B5CF6"
+                        android:layout_marginBottom="6dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Device Name"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:id="@+id/tv_device_name_summary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Rename on network"
+                        android:textColor="#8E8E93"
+                        android:textSize="10sp"
+                        android:layout_marginTop="2dp"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <!-- Option 2: Change Profile -->
+                <LinearLayout
+                    android:id="@+id/option_change_profile"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Free up storage space"
-                    android:textColor="#8E8E93"
-                    android:textSize="10sp"
-                    android:layout_marginTop="3dp"
-                    android:gravity="center" />
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:minHeight="85dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="10dp"
+                    android:background="@drawable/dialog_option_bg"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_folder"
+                        android:tint="#10B981"
+                        android:layout_marginBottom="6dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Profile"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:id="@+id/tv_profile_summary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Switch active profile"
+                        android:textColor="#8E8E93"
+                        android:textSize="10sp"
+                        android:layout_marginTop="2dp"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
             </LinearLayout>
 
-            <!-- Option 4: Disconnect -->
+            <!-- Row 2: Clear Cache and Disconnect -->
             <LinearLayout
-                android:id="@+id/option_disconnect"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_marginStart="6dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="12dp"
-                android:background="@drawable/dialog_option_bg_danger"
-                android:clickable="true"
-                android:focusable="true">
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2">
 
-                <ImageView
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:src="@drawable/ic_power"
-                    android:tint="#EF4444"
-                    android:layout_marginBottom="8dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
+                <!-- Option 3: Clear Cache -->
+                <LinearLayout
+                    android:id="@+id/option_clear_cache"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Disconnect"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:gravity="center" />
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:minHeight="85dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="10dp"
+                    android:background="@drawable/dialog_option_bg"
+                    android:clickable="true"
+                    android:focusable="true">
 
-                <TextView
-                    android:layout_width="wrap_content"
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_restart"
+                        android:tint="#F59E0B"
+                        android:layout_marginBottom="6dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Clear Cache"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Free up storage space"
+                        android:textColor="#8E8E93"
+                        android:textSize="10sp"
+                        android:layout_marginTop="2dp"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <!-- Option 4: Disconnect -->
+                <LinearLayout
+                    android:id="@+id/option_disconnect"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Close &amp; exit"
-                    android:textColor="#8E8E93"
-                    android:textSize="10sp"
-                    android:layout_marginTop="3dp"
-                    android:gravity="center" />
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:minHeight="85dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="10dp"
+                    android:background="@drawable/dialog_option_bg_danger"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_power"
+                        android:tint="#EF4444"
+                        android:layout_marginBottom="6dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Disconnect"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Close &amp; exit"
+                        android:textColor="#8E8E93"
+                        android:textSize="10sp"
+                        android:layout_marginTop="2dp"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
             </LinearLayout>
-
         </LinearLayout>
+
     </LinearLayout>
 
-</LinearLayout>
+</ScrollView>

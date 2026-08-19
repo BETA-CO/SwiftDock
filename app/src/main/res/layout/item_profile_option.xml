@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="56dp"
     android:orientation="horizontal"
@@ -24,11 +25,21 @@
         android:ellipsize="end" />
 
     <ImageView
+        android:id="@+id/profile_lock_icon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginEnd="10dp"
+        android:src="@drawable/ic_lock"
+        app:tint="#F59E0B"
+        android:visibility="gone"
+        android:contentDescription="Locked profile" />
+
+    <ImageView
         android:id="@+id/profile_check"
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:src="@drawable/ic_check_circle"
-        android:tint="#10B981"
+        app:tint="#10B981"
         android:visibility="gone"
         android:contentDescription="Active profile" />
 

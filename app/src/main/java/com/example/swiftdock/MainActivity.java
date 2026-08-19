@@ -4,25 +4,17 @@ import android.os.Bundle;
 
 import androidx.activity.EdgeToEdge;
 
-import com.google.android.material.snackbar.Snackbar;
-
-import androidx.appcompat.app.AppCompatActivity;
-
 import android.view.View;
 
-import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 import androidx.navigation.fragment.NavHostFragment;
 
-import com.example.swiftdock.databinding.ActivityMainBinding;
+import androidx.appcompat.app.AppCompatActivity;
 
-import android.view.Menu;
-import android.view.MenuItem;
+import com.example.swiftdock.databinding.ActivityMainBinding;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -82,47 +74,26 @@ public class MainActivity extends AppCompatActivity {
                     );
                 }
                 binding.main.setPadding(0, 0, 0, 0);
-                ViewCompat.setOnApplyWindowInsetsListener(binding.main, (v, in) -> in);
             });
         }
+    }
 
-        // Clear update cache files on startup to free space after installation
-        try {
-            java.io.File cacheDir = getExternalCacheDir();
-            if (cacheDir != null) {
-                java.io.File residualApk = new java.io.File(cacheDir, "SwiftDockUpdate.apk");
-                if (residualApk.exists()) {
-                    residualApk.delete();
-                }
+    @Override
+    public boolean onKeyDown(int keyCode, android.view.KeyEvent event) {
+        if (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP) {
+            SecondFragment fragment = SecondFragment.getInstance();
+            if (fragment != null && fragment.getNetworkClient() != null && fragment.getNetworkClient().isConnected()) {
+                fragment.getNetworkClient().sendVolumeKeyPress("volume_up");
+                return true;
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } else if (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN) {
+            SecondFragment fragment = SecondFragment.getInstance();
+            if (fragment != null && fragment.getNetworkClient() != null && fragment.getNetworkClient().isConnected()) {
+                fragment.getNetworkClient().sendVolumeKeyPress("volume_down");
+                return true;
+            }
         }
-
-        // FAB removed
-        checkForMobileUpdates();
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
+        return super.onKeyDown(keyCode, event);
     }
 
     @Override
@@ -132,205 +103,5 @@ public class MainActivity extends AppCompatActivity {
         NavController navController = navHostFragment.getNavController();
         return NavigationUI.navigateUp(navController, appBarConfiguration)
                 || super.onSupportNavigateUp();
-    }
-
-    private void checkForMobileUpdates() {
-        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
-        android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-
-        executor.execute(() -> {
-            java.net.HttpURLConnection connection = null;
-            java.io.BufferedReader reader = null;
-            try {
-                java.net.URL url = new java.net.URL("https://raw.githubusercontent.com/BETA-CO/SwiftDock/main/update_mobile.json");
-                connection = (java.net.HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-
-                int responseCode = connection.getResponseCode();
-                if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
-                    java.io.InputStream in = connection.getInputStream();
-                    reader = new java.io.BufferedReader(new java.io.InputStreamReader(in));
-                    StringBuilder result = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        result.append(line);
-                    }
-
-                    org.json.JSONObject json = new org.json.JSONObject(result.toString());
-                    int onlineVersionCode = json.optInt("versionCode", 0);
-                    String onlineVersionName = json.optString("versionName", "");
-                    String apkUrl = json.optString("apkUrl", "");
-                    String changelog = json.optString("changelog", "");
-
-                    // Compare with current version using BuildConfig for reliability
-                    int currentVersionCode = BuildConfig.VERSION_CODE;
-
-                    if (onlineVersionCode > currentVersionCode) {
-                        handler.post(() -> showUpdatePrompt(onlineVersionName, apkUrl, changelog));
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            } finally {
-                if (reader != null) {
-                    try { reader.close(); } catch (Exception ignored) {}
-                }
-                if (connection != null) {
-                    connection.disconnect();
-                }
-            }
-        });
-    }
-
-    private void showUpdatePrompt(String versionName, String apkUrl, String changelog) {
-        android.view.View dialogView = getLayoutInflater().inflate(R.layout.dialog_update_prompt, null);
-        
-        android.widget.TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
-        android.widget.TextView tvMessage = dialogView.findViewById(R.id.tv_dialog_message);
-        android.widget.Button btnLater = dialogView.findViewById(R.id.btn_dialog_later);
-        android.widget.Button btnUpdate = dialogView.findViewById(R.id.btn_dialog_update);
-
-        tvTitle.setText("Update Available");
-        tvMessage.setText("A new version of SwiftDock (v" + versionName + ") is available.\n\nChangelog:\n" + changelog + "\n\nDo you want to download and install it now?");
-
-        androidx.appcompat.app.AlertDialog alertDialog = new androidx.appcompat.app.AlertDialog.Builder(this)
-            .setView(dialogView)
-            .setCancelable(true)
-            .create();
-
-        if (alertDialog.getWindow() != null) {
-            alertDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
-        }
-
-        btnLater.setOnClickListener(v -> alertDialog.dismiss());
-        btnUpdate.setOnClickListener(v -> {
-            alertDialog.dismiss();
-            downloadAndInstallApk(apkUrl);
-        });
-
-        alertDialog.show();
-    }
-
-    private void downloadAndInstallApk(String apkUrl) {
-        android.view.View dialogView = getLayoutInflater().inflate(R.layout.dialog_update_progress, null);
-        android.widget.ProgressBar progressBar = dialogView.findViewById(R.id.progress_bar_download);
-        android.widget.TextView tvProgress = dialogView.findViewById(R.id.tv_progress_percentage);
-
-        androidx.appcompat.app.AlertDialog progressDialog = new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setView(dialogView)
-                .setCancelable(false)
-                .create();
-
-        if (progressDialog.getWindow() != null) {
-            progressDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
-        }
-
-        progressDialog.show();
-
-        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
-        android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-
-        executor.execute(() -> {
-            java.net.HttpURLConnection connection = null;
-            java.io.InputStream input = null;
-            java.io.OutputStream output = null;
-            java.io.File apkFile = null;
-            try {
-                java.net.URL url = new java.net.URL(apkUrl);
-                connection = (java.net.HttpURLConnection) url.openConnection();
-                connection.setInstanceFollowRedirects(true);
-                connection.setConnectTimeout(10000);
-                connection.setReadTimeout(15000);
-
-                int status = connection.getResponseCode();
-                if (status == java.net.HttpURLConnection.HTTP_MOVED_TEMP || status == java.net.HttpURLConnection.HTTP_MOVED_PERM || status == java.net.HttpURLConnection.HTTP_SEE_OTHER || status == 307 || status == 308) {
-                    String redirectUrl = connection.getHeaderField("Location");
-                    if (redirectUrl != null && !redirectUrl.isEmpty()) {
-                        connection.disconnect();
-                        url = new java.net.URL(redirectUrl);
-                        connection = (java.net.HttpURLConnection) url.openConnection();
-                        connection.setConnectTimeout(10000);
-                        connection.setReadTimeout(15000);
-                    }
-                }
-                connection.connect();
-
-                int fileLength = connection.getContentLength();
-                input = connection.getInputStream();
-
-                apkFile = new java.io.File(getExternalCacheDir(), "SwiftDockUpdate.apk");
-                if (apkFile.exists()) {
-                    apkFile.delete();
-                }
-                output = new java.io.FileOutputStream(apkFile);
-
-                byte[] data = new byte[8192];
-                long total = 0;
-                int count;
-                while ((count = input.read(data)) != -1) {
-                    total += count;
-                    if (fileLength > 0) {
-                        int progress = (int) (total * 100 / fileLength);
-                        handler.post(() -> {
-                            progressBar.setProgress(progress);
-                            tvProgress.setText(progress + "%");
-                        });
-                    }
-                    output.write(data, 0, count);
-                }
-                output.flush();
-
-                final java.io.File finalApkFile = apkFile;
-                handler.post(() -> {
-                    progressDialog.dismiss();
-                    installApk(finalApkFile);
-                });
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                handler.post(() -> {
-                    progressDialog.dismiss();
-                    android.widget.Toast.makeText(this, "Download failed: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
-                });
-            } finally {
-                try {
-                    if (output != null) output.close();
-                    if (input != null) input.close();
-                } catch (Exception ignored) {}
-                if (connection != null) connection.disconnect();
-            }
-        });
-    }
-
-    private void installApk(java.io.File file) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            if (!getPackageManager().canRequestPackageInstalls()) {
-                new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("Permission Required")
-                    .setMessage("To install updates directly, SwiftDock requires the 'Install unknown apps' permission.\n\nPlease enable it in the system settings.")
-                    .setPositiveButton("Settings", (dialog, which) -> {
-                        android.content.Intent intent = new android.content.Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
-                        intent.setData(android.net.Uri.parse("package:" + getPackageName()));
-                        startActivity(intent);
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
-                return;
-            }
-        }
-
-        android.net.Uri apkUri = androidx.core.content.FileProvider.getUriForFile(
-                this,
-                getPackageName() + ".fileprovider",
-                file
-        );
-
-        android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
-        intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-        intent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(intent);
     }
 }

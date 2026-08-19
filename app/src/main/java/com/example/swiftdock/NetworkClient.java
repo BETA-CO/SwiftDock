@@ -35,19 +35,26 @@ public class NetworkClient {
         void onTransitionToGrid();
         default void onPerformanceUpdated(int cpu, int gpu, int ram, int temp, String wifi) {}
         default void onProfilesSynced(List<ProfileInfo> profiles, String currentProfileId) {}
+        default void onConfirmActionRequest(String actionId, String title, String message) {}
+        default void onProfileUnlockResponse(String profileId, boolean success) {}
+        default void onProfileUnlockRequired(String profileId) {}
+        default void onPowerActionExecuting(String action) {}
     }
 
     public static class ProfileInfo {
         private String id;
         private String name;
+        private boolean isLocked;
 
-        public ProfileInfo(String id, String name) {
+        public ProfileInfo(String id, String name, boolean isLocked) {
             this.id = id;
             this.name = name;
+            this.isLocked = isLocked;
         }
 
         public String getId() { return id; }
         public String getName() { return name; }
+        public boolean isLocked() { return isLocked; }
     }
 
     public static int currentCpu = 0;
@@ -64,6 +71,13 @@ public class NetworkClient {
     private final Handler mainHandler;
     private final List<NetworkListener> listeners = new ArrayList<>();
     private String sessionToken;
+    private static javax.crypto.spec.SecretKeySpec cachedSecretKey;
+    private static String cachedTokenKey;
+    private final ExecutorService socketWriterExecutor = Executors.newSingleThreadExecutor();
+    private final java.util.concurrent.atomic.AtomicBoolean isGyroSending = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private float pendingGyroDx = 0f;
+    private float pendingGyroDy = 0f;
+    private String pendingGyroMode = null;
 
     // Keep track of discovered server
     private String discoveredIp;
@@ -354,12 +368,14 @@ public class NetworkClient {
 
         new Thread(() -> {
             try {
-                closeTcpConnection();
+                resetSocketState();
                 sessionToken = null;
                 
                 tcpSocket = new Socket();
-                tcpSocket.connect(new InetSocketAddress(ip, 19001), 4000);
-                tcpSocket.setSoTimeout(7000);
+                tcpSocket.setTcpNoDelay(true);
+                tcpSocket.setKeepAlive(true);
+                tcpSocket.connect(new InetSocketAddress(ip, 19001), 3000);
+                tcpSocket.setSoTimeout(6000);
                 outputStream = tcpSocket.getOutputStream();
 
                 // Send AUTH request
@@ -410,12 +426,14 @@ public class NetworkClient {
 
         new Thread(() -> {
             try {
-                closeTcpConnection();
+                resetSocketState();
                 sessionToken = savedToken;
  
                 tcpSocket = new Socket();
-                tcpSocket.connect(new InetSocketAddress(ip, 19001), 6000);
-                tcpSocket.setSoTimeout(7000);
+                tcpSocket.setTcpNoDelay(true);
+                tcpSocket.setKeepAlive(true);
+                tcpSocket.connect(new InetSocketAddress(ip, 19001), 2500);
+                tcpSocket.setSoTimeout(5000);
                 outputStream = tcpSocket.getOutputStream();
 
                 // Send RECONNECT request
@@ -457,7 +475,7 @@ public class NetworkClient {
     }
 
     public void sendButtonPress(String buttonId) {
-        new Thread(() -> {
+        socketWriterExecutor.execute(() -> {
             try {
                 JSONObject pressRequest = new JSONObject();
                 pressRequest.put("type", "BUTTON_PRESS");
@@ -466,11 +484,11 @@ public class NetworkClient {
             } catch (Exception e) {
                 Log.e(TAG, "Error sending button press: " + e.getMessage());
             }
-        }).start();
+        });
     }
 
     public void sendChangeProfile(String profileId) {
-        new Thread(() -> {
+        socketWriterExecutor.execute(() -> {
             try {
                 JSONObject request = new JSONObject();
                 request.put("type", "CHANGE_PROFILE");
@@ -479,11 +497,102 @@ public class NetworkClient {
             } catch (Exception e) {
                 Log.e(TAG, "Error sending change profile: " + e.getMessage());
             }
-        }).start();
+        });
+    }
+
+    public void sendPresentationCmd(String cmd) {
+        socketWriterExecutor.execute(() -> {
+            try {
+                JSONObject request = new JSONObject();
+                request.put("type", "PRESENTATION_CMD");
+                request.put("cmd", cmd);
+                sendRaw(request.toString());
+            } catch (Exception e) {
+                Log.e(TAG, "Error sending presentation cmd: " + e.getMessage());
+            }
+        });
+    }
+
+    public void sendConfirmActionResponse(String actionId, boolean confirmed) {
+        socketWriterExecutor.execute(() -> {
+            try {
+                JSONObject response = new JSONObject();
+                response.put("type", "CONFIRM_ACTION_RESPONSE");
+                response.put("actionId", actionId);
+                response.put("confirmed", confirmed);
+                sendRaw(response.toString());
+            } catch (Exception e) {
+                Log.e(TAG, "Error sending confirm action response: " + e.getMessage());
+            }
+        });
+    }
+
+    public void sendProfileUnlockRequest(String profileId, String pin) {
+        socketWriterExecutor.execute(() -> {
+            try {
+                JSONObject request = new JSONObject();
+                request.put("type", "PROFILE_UNLOCK_REQUEST");
+                request.put("profileId", profileId);
+                request.put("pin", pin);
+                sendRaw(request.toString());
+            } catch (Exception e) {
+                Log.e(TAG, "Error sending profile unlock request: " + e.getMessage());
+            }
+        });
+    }
+
+    public void sendPresentationGyro(String mode, float dx, float dy) {
+        if (mode == null) return;
+        synchronized (this) {
+            pendingGyroMode = mode;
+            pendingGyroDx += dx;
+            pendingGyroDy += dy;
+        }
+
+        if (isGyroSending.compareAndSet(false, true)) {
+            socketWriterExecutor.execute(() -> {
+                try {
+                    String m;
+                    float sendDx, sendDy;
+                    synchronized (this) {
+                        m = pendingGyroMode;
+                        sendDx = pendingGyroDx;
+                        sendDy = pendingGyroDy;
+                        pendingGyroDx = 0f;
+                        pendingGyroDy = 0f;
+                    }
+                    if (m != null && (Math.abs(sendDx) > 0.0001f || Math.abs(sendDy) > 0.0001f)) {
+                        JSONObject request = new JSONObject();
+                        request.put("type", "PRESENTATION_GYRO");
+                        request.put("mode", m);
+                        request.put("dx", (double) sendDx);
+                        request.put("dy", (double) sendDy);
+                        sendRaw(request.toString());
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error sending presentation gyro: " + e.getMessage());
+                } finally {
+                    isGyroSending.set(false);
+                }
+            });
+        }
+    }
+
+    public void sendVolumeKeyPress(String key) {
+        socketWriterExecutor.execute(() -> {
+            try {
+                JSONObject request = new JSONObject();
+                request.put("type", "VOLUME_KEY_PRESS");
+                request.put("key", key);
+                sendRaw(request.toString());
+            } catch (Exception e) {
+                Log.e(TAG, "Error sending volume key press: " + e.getMessage());
+            }
+        });
     }
 
     public void sendLayoutChange(final int cols, final int rows) {
-        new Thread(() -> {
+        socketWriterExecutor.execute(() -> {
             try {
                 JSONObject layoutReq = new JSONObject();
                 layoutReq.put("type", "LAYOUT_CHANGE");
@@ -493,11 +602,11 @@ public class NetworkClient {
             } catch (Exception e) {
                 Log.e(TAG, "Failed to send layout change: " + e.getMessage());
             }
-        }).start();
+        });
     }
 
     public void sendPageChange(final int pageIndex) {
-        new Thread(() -> {
+        socketWriterExecutor.execute(() -> {
             try {
                 JSONObject pageReq = new JSONObject();
                 pageReq.put("type", "PAGE_CHANGE");
@@ -506,11 +615,11 @@ public class NetworkClient {
             } catch (Exception e) {
                 Log.e(TAG, "Failed to send page change: " + e.getMessage());
             }
-        }).start();
+        });
     }
 
     public void disconnect() {
-        new Thread(this::closeTcpConnection).start();
+        socketWriterExecutor.execute(this::closeTcpConnection);
     }
 
     private void sendRaw(String msg) throws Exception {
@@ -528,7 +637,7 @@ public class NetworkClient {
     }
 
     private void sendHeartbeatAck() {
-        new Thread(() -> {
+        socketWriterExecutor.execute(() -> {
             try {
                 JSONObject ack = new JSONObject();
                 ack.put("type", "HEARTBEAT_ACK");
@@ -536,10 +645,10 @@ public class NetworkClient {
             } catch (Exception e) {
                 Log.e(TAG, "Error sending HEARTBEAT_ACK: " + e.getMessage());
             }
-        }).start();
+        });
     }
 
-    private void closeTcpConnection() {
+    private void resetSocketState() {
         isRunning = false;
         if (tcpThread != null) {
             tcpThread.interrupt();
@@ -553,6 +662,10 @@ public class NetworkClient {
         }
         tcpSocket = null;
         outputStream = null;
+    }
+
+    private void closeTcpConnection() {
+        resetSocketState();
         sessionToken = null;
         cachedButtons.clear();
         notifyDisconnected();
@@ -633,19 +746,75 @@ public class NetworkClient {
                         JSONObject pObj = profilesArray.getJSONObject(i);
                         profiles.add(new ProfileInfo(
                                 pObj.optString("id", ""),
-                                pObj.optString("name", "")
+                                pObj.optString("name", ""),
+                                pObj.optBoolean("isLocked", false)
                         ));
                     }
                 }
                 cachedProfiles = profiles;
                 currentProfileId = activeProfileId;
                 notifyProfilesSynced(profiles, activeProfileId);
+            } else if ("PROFILE_UNLOCK_RESPONSE".equalsIgnoreCase(type)) {
+                String profileId = root.optString("profileId", "");
+                boolean success = root.optBoolean("success", false);
+                notifyProfileUnlockResponse(profileId, success);
+            } else if ("PROFILE_UNLOCK_REQUIRED".equalsIgnoreCase(type)) {
+                String profileId = root.optString("profileId", "");
+                notifyProfileUnlockRequired(profileId);
+            } else if ("CONFIRM_ACTION_REQUEST".equalsIgnoreCase(type)) {
+                String actionId = root.optString("actionId", "");
+                String title = root.optString("title", "Confirm Action");
+                String message = root.optString("message", "Are you sure you want to perform this action?");
+                notifyConfirmActionRequest(actionId, title, message);
+            } else if ("POWER_ACTION_EXECUTING".equalsIgnoreCase(type)) {
+                String action = root.optString("action", "");
+                notifyPowerActionExecuting(action);
             } else if ("HEARTBEAT".equalsIgnoreCase(type)) {
                 sendHeartbeatAck();
             }
         } catch (Exception e) {
             Log.e(TAG, "Error parsing incoming packet: " + e.getMessage());
         }
+    }
+
+    private void notifyPowerActionExecuting(final String action) {
+        mainHandler.post(() -> {
+            synchronized (listeners) {
+                for (NetworkListener l : listeners) {
+                    l.onPowerActionExecuting(action);
+                }
+            }
+        });
+    }
+
+    private void notifyProfileUnlockResponse(final String profileId, final boolean success) {
+        mainHandler.post(() -> {
+            synchronized (listeners) {
+                for (NetworkListener l : listeners) {
+                    l.onProfileUnlockResponse(profileId, success);
+                }
+            }
+        });
+    }
+
+    private void notifyProfileUnlockRequired(final String profileId) {
+        mainHandler.post(() -> {
+            synchronized (listeners) {
+                for (NetworkListener l : listeners) {
+                    l.onProfileUnlockRequired(profileId);
+                }
+            }
+        });
+    }
+
+    private void notifyConfirmActionRequest(final String actionId, final String title, final String message) {
+        mainHandler.post(() -> {
+            synchronized (listeners) {
+                for (NetworkListener l : listeners) {
+                    l.onConfirmActionRequest(actionId, title, message);
+                }
+            }
+        });
     }
 
     // Thread-safe listeners notify helpers
@@ -773,9 +942,14 @@ public class NetworkClient {
     }
 
     // AES Cryptographic Helpers
-    private static byte[] deriveKey(String token) throws Exception {
-        java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-        return digest.digest(token.getBytes("UTF-8"));
+    private static synchronized javax.crypto.spec.SecretKeySpec getSecretKey(String token) throws Exception {
+        if (cachedSecretKey == null || !token.equals(cachedTokenKey)) {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] keyBytes = digest.digest(token.getBytes("UTF-8"));
+            cachedSecretKey = new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
+            cachedTokenKey = token;
+        }
+        return cachedSecretKey;
     }
 
     private static String encrypt(String plainText, String token) {
@@ -783,8 +957,7 @@ public class NetworkClient {
         if (token == null || token.isEmpty()) return plainText;
 
         try {
-            byte[] keyBytes = deriveKey(token);
-            javax.crypto.spec.SecretKeySpec secretKey = new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
+            javax.crypto.spec.SecretKeySpec secretKey = getSecretKey(token);
 
             javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding");
             byte[] iv = new byte[16];
@@ -818,8 +991,7 @@ public class NetworkClient {
             System.arraycopy(combined, 0, iv, 0, 16);
             System.arraycopy(combined, 16, encrypted, 0, encrypted.length);
 
-            byte[] keyBytes = deriveKey(token);
-            javax.crypto.spec.SecretKeySpec secretKey = new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
+            javax.crypto.spec.SecretKeySpec secretKey = getSecretKey(token);
             javax.crypto.spec.IvParameterSpec ivSpec = new javax.crypto.spec.IvParameterSpec(iv);
 
             javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding");
