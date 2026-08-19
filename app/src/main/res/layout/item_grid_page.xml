@@ -14,6 +14,8 @@
         android:padding="16dp"
         android:clipToPadding="false"
         android:stretchMode="columnWidth"
+        android:listSelector="@android:color/transparent"
+        android:drawSelectorOnTop="false"
         android:gravity="center" />
 
 </FrameLayout>
