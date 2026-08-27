@@ -1,8 +1,8 @@
 # ProGuard rules for SwiftDock Android App
 
 # Keep data models
--keep class com.example.swiftdock.ShortcutButton { *; }
--keep class com.example.swiftdock.NetworkClient$ProfileInfo { *; }
+-keep class com.swiftdock.app.ShortcutButton { *; }
+-keep class com.swiftdock.app.NetworkClient$ProfileInfo { *; }
 
 # Keep androidx viewbinding & navigation
 -keepclassmembers class * implements androidx.viewbinding.ViewBinding {

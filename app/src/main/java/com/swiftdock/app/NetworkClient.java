@@ -1,4 +1,4 @@
-package com.example.swiftdock;
+package com.swiftdock.app;
 
 import android.os.Handler;
 import android.os.Looper;
@@ -73,11 +73,13 @@ public class NetworkClient {
     private String sessionToken;
     private static javax.crypto.spec.SecretKeySpec cachedSecretKey;
     private static String cachedTokenKey;
+    private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
     private final ExecutorService socketWriterExecutor = Executors.newSingleThreadExecutor();
     private final java.util.concurrent.atomic.AtomicBoolean isGyroSending = new java.util.concurrent.atomic.AtomicBoolean(false);
     private float pendingGyroDx = 0f;
     private float pendingGyroDy = 0f;
     private String pendingGyroMode = null;
+    private Runnable discoveryRunnable;
 
     // Keep track of discovered server
     private String discoveredIp;
@@ -175,12 +177,37 @@ public class NetworkClient {
     }
 
     private String getLocalSubnet(android.content.Context context) {
+        // Try WifiManager FIRST (direct Wi-Fi adapter connection info)
+        try {
+            android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) context.getApplicationContext().getSystemService(android.content.Context.WIFI_SERVICE);
+            if (wm != null) {
+                android.net.wifi.WifiInfo connectionInfo = wm.getConnectionInfo();
+                if (connectionInfo != null) {
+                    int ipAddress = connectionInfo.getIpAddress();
+                    if (ipAddress != 0) {
+                        String subnet = String.format("%d.%d.%d.",
+                                (ipAddress & 0xff),
+                                (ipAddress >> 8 & 0xff),
+                                (ipAddress >> 16 & 0xff));
+                        Log.d(TAG, "Resolved local subnet prefix via WifiManager: " + subnet);
+                        return subnet;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "WifiManager failed: " + e.getMessage());
+        }
+
+        // Fallback: Check NetworkInterfaces, filtering out loopback, VPN, and cellular interfaces
         try {
             java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
             if (interfaces != null) {
                 while (interfaces.hasMoreElements()) {
                     java.net.NetworkInterface iface = interfaces.nextElement();
-                    if (iface.isLoopback() || !iface.isUp()) {
+                    String name = iface.getName() != null ? iface.getName().toLowerCase() : "";
+                    if (iface.isLoopback() || !iface.isUp() || 
+                        name.contains("tun") || name.contains("tap") || name.contains("ppp") || 
+                        name.contains("p2p") || name.contains("dummy") || name.contains("rmnet")) {
                         continue;
                     }
                     
@@ -203,27 +230,6 @@ public class NetworkClient {
         } catch (Exception e) {
             Log.e(TAG, "Failed to get subnet via NetworkInterface: " + e.getMessage());
         }
-
-        // Fallback to WifiManager
-        try {
-            android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) context.getApplicationContext().getSystemService(android.content.Context.WIFI_SERVICE);
-            if (wm != null) {
-                android.net.wifi.WifiInfo connectionInfo = wm.getConnectionInfo();
-                if (connectionInfo != null) {
-                    int ipAddress = connectionInfo.getIpAddress();
-                    if (ipAddress != 0) {
-                        String subnet = String.format("%d.%d.%d.",
-                                (ipAddress & 0xff),
-                                (ipAddress >> 8 & 0xff),
-                                (ipAddress >> 16 & 0xff));
-                        Log.d(TAG, "Resolved local subnet prefix via WifiManager fallback: " + subnet);
-                        return subnet;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Fallback WifiManager failed: " + e.getMessage());
-        }
         return null;
     }
 
@@ -240,7 +246,7 @@ public class NetworkClient {
 
         new Thread(() -> {
             Log.d(TAG, "Starting parallel subnet scan on subnet: " + subnet);
-            final java.util.concurrent.ExecutorService localExecutor = Executors.newFixedThreadPool(30);
+            final java.util.concurrent.ExecutorService localExecutor = Executors.newFixedThreadPool(12);
             scanExecutor = localExecutor;
  
             for (int i = 1; i <= 254; i++) {
@@ -250,7 +256,7 @@ public class NetworkClient {
                         Socket socket = null;
                         try {
                             socket = new Socket();
-                            socket.connect(new InetSocketAddress(host, 19001), 800); // 800ms TCP connection check
+                            socket.connect(new InetSocketAddress(host, 19001), 450); // Fast 450ms TCP connection check
                             
                             Log.d(TAG, "Found server via TCP scan at " + host);
                             
@@ -300,9 +306,24 @@ public class NetworkClient {
         }).start();
     }
 
-    // Start UDP discovery service and TCP subnet scan in parallel
-    public void startDiscovery(final android.content.Context context) {
-        startNetworkScan(context);
+    // Start UDP discovery service and TCP subnet scan in parallel with periodic rescan
+    public synchronized void startDiscovery(final android.content.Context context) {
+        if (discoveryRunnable != null) {
+            mainHandler.removeCallbacks(discoveryRunnable);
+        }
+
+        discoveryRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!isConnected()) {
+                    startNetworkScan(context);
+                    if (discoveryRunnable != null) {
+                        mainHandler.postDelayed(this, 8000); // Periodic 8s rescan while waiting
+                    }
+                }
+            }
+        };
+        mainHandler.post(discoveryRunnable);
 
         if (udpThread != null && udpThread.isAlive()) return;
 
@@ -311,30 +332,35 @@ public class NetworkClient {
             try {
                 udpSocket = new DatagramSocket(null);
                 udpSocket.setReuseAddress(true);
+                udpSocket.setSoTimeout(3000);
                 udpSocket.bind(new InetSocketAddress(UDP_PORT));
                 byte[] buffer = new byte[1024];
 
                 Log.d(TAG, "UDP Discovery listener started on port " + UDP_PORT);
 
                 while (!Thread.currentThread().isInterrupted()) {
-                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                    udpSocket.receive(packet);
+                    try {
+                        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                        udpSocket.receive(packet);
 
-                    String message = new String(packet.getData(), 0, packet.getLength()).trim();
-                    // Expected format: SwiftDock-Server:<Port>:<Hostname>
-                    if (message.startsWith("SwiftDock-Server:")) {
-                        String[] parts = message.split(":", 3);
-                        if (parts.length >= 3) {
-                            String ip = packet.getAddress().getHostAddress();
-                            int port = Integer.parseInt(parts[1]);
-                            String hostname = parts[2];
+                        String message = new String(packet.getData(), 0, packet.getLength()).trim();
+                        // Expected format: SwiftDock-Server:<Port>:<Hostname>
+                        if (message.startsWith("SwiftDock-Server:")) {
+                            String[] parts = message.split(":", 3);
+                            if (parts.length >= 3) {
+                                String ip = packet.getAddress().getHostAddress();
+                                int port = Integer.parseInt(parts[1]);
+                                String hostname = parts[2];
 
-                            discoveredIp = ip;
-                            discoveredPort = port;
-                            discoveredHostname = hostname;
+                                discoveredIp = ip;
+                                discoveredPort = port;
+                                discoveredHostname = hostname;
 
-                            notifyServerDiscovered(ip, port, hostname);
+                                notifyServerDiscovered(ip, port, hostname);
+                            }
                         }
+                    } catch (java.net.SocketTimeoutException e) {
+                        // Socket timeout allows thread loop check
                     }
                 }
             } catch (Exception e) {
@@ -348,7 +374,11 @@ public class NetworkClient {
         udpThread.start();
     }
 
-    public void stopDiscovery() {
+    public synchronized void stopDiscovery() {
+        if (discoveryRunnable != null) {
+            mainHandler.removeCallbacks(discoveryRunnable);
+            discoveryRunnable = null;
+        }
         if (udpThread != null) {
             udpThread.interrupt();
             udpThread = null;
@@ -374,6 +404,8 @@ public class NetworkClient {
                 tcpSocket = new Socket();
                 tcpSocket.setTcpNoDelay(true);
                 tcpSocket.setKeepAlive(true);
+                tcpSocket.setSendBufferSize(65536);
+                tcpSocket.setReceiveBufferSize(65536);
                 tcpSocket.connect(new InetSocketAddress(ip, 19001), 3000);
                 tcpSocket.setSoTimeout(6000);
                 outputStream = tcpSocket.getOutputStream();
@@ -432,6 +464,8 @@ public class NetworkClient {
                 tcpSocket = new Socket();
                 tcpSocket.setTcpNoDelay(true);
                 tcpSocket.setKeepAlive(true);
+                tcpSocket.setSendBufferSize(65536);
+                tcpSocket.setReceiveBufferSize(65536);
                 tcpSocket.connect(new InetSocketAddress(ip, 19001), 2500);
                 tcpSocket.setSoTimeout(5000);
                 outputStream = tcpSocket.getOutputStream();
@@ -961,7 +995,7 @@ public class NetworkClient {
 
             javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding");
             byte[] iv = new byte[16];
-            new java.security.SecureRandom().nextBytes(iv);
+            SECURE_RANDOM.nextBytes(iv);
             javax.crypto.spec.IvParameterSpec ivSpec = new javax.crypto.spec.IvParameterSpec(iv);
 
             cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKey, ivSpec);

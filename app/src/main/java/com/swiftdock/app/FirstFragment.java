@@ -1,4 +1,4 @@
-package com.example.swiftdock;
+package com.swiftdock.app;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -60,9 +60,11 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        
-        // Force Landscape orientation during wizard connection
-        requireActivity().setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+
+        // Lock start/home connection screen to landscape orientation
+        if (getActivity() != null) {
+            getActivity().setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        }
 
         // Bind layouts
         layoutReconnecting = view.findViewById(R.id.layout_reconnecting);
@@ -171,6 +173,15 @@ public class FirstFragment extends Fragment implements NetworkClient.NetworkList
         }
 
         // Start discovery in background
+        startDiscovery();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (getActivity() != null) {
+            getActivity().setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        }
         startDiscovery();
     }
 
