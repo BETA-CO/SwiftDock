@@ -1,4 +1,4 @@
-package com.example.swiftdock;
+package com.swiftdock.app;
 
 import java.io.Serializable;
 

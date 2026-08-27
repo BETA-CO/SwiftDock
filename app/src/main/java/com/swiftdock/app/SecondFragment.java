@@ -1,4 +1,4 @@
-package com.example.swiftdock;
+package com.swiftdock.app;
 
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
@@ -228,7 +228,7 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
         super.onViewCreated(view, savedInstanceState);
         instance = this;
 
-        // Force Sensor-based Auto-rotation (allowing portrait and landscape)
+        // Enable full sensor auto-rotation for dock screen (supporting both portrait and landscape dock layouts)
         requireActivity().setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
 
         viewPager = view.findViewById(R.id.view_pager);
@@ -636,13 +636,34 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
     public void onTransitionToGrid() {}
 
     @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (iconCache != null) {
+            iconCache.evictAll();
+        }
+    }
+
+    @Override
     public void onPerformanceUpdated(int cpu, int gpu, int ram, int temp, String wifi) {
         if (!isAdded()) return;
         if (isHoldingButton) {
             // Do not refresh layout when holding a button to prevent touch event disruption
             return;
         }
-        if (pagerAdapter != null) {
+
+        // Only refresh layout if there are active performance metric buttons on the grid
+        boolean hasPerfMetricButton = false;
+        if (buttonsList != null) {
+            for (ShortcutButton b : buttonsList) {
+                if (b != null && "System".equalsIgnoreCase(b.getActionType()) && 
+                    b.getActionData() != null && b.getActionData().startsWith("perf_")) {
+                    hasPerfMetricButton = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasPerfMetricButton && pagerAdapter != null) {
             pagerAdapter.notifyDataSetChanged();
         }
     }

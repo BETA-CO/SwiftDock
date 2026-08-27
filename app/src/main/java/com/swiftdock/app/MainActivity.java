@@ -1,4 +1,4 @@
-package com.example.swiftdock;
+package com.swiftdock.app;
 
 import android.os.Bundle;
 
@@ -14,7 +14,7 @@ import androidx.navigation.fragment.NavHostFragment;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.swiftdock.databinding.ActivityMainBinding;
+import com.swiftdock.app.databinding.ActivityMainBinding;
 
 public class MainActivity extends AppCompatActivity {
 

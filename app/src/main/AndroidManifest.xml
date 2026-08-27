@@ -16,17 +16,28 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.SwiftDock">
+
+        <!-- Splash Activity as Launcher - LOCKED TO LANDSCAPE -->
         <activity
-            android:name=".MainActivity"
-            android:exported="true" 
-            android:theme="@style/Theme.SwiftDock"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
-            android:windowSoftInputMode="adjustResize">
+            android:name=".SplashActivity"
+            android:exported="true"
+            android:theme="@style/Theme.SwiftDock.Splash"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <!-- Main Activity - LOCKED TO LANDSCAPE -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SwiftDock"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
+            android:windowSoftInputMode="adjustResize">
         </activity>
     </application>
 
