@@ -9,15 +9,22 @@ public class ShortcutButton implements Serializable {
     private String icon;
     private String actionType;
     private String actionData;
+    private boolean isLongPressEnabled;
+
     public ShortcutButton() {}
 
     public ShortcutButton(String id, String title, String icon, String actionType, String actionData, String color) {
+        this(id, title, icon, actionType, actionData, color, false);
+    }
+
+    public ShortcutButton(String id, String title, String icon, String actionType, String actionData, String color, boolean isLongPressEnabled) {
         this.id = id;
         this.title = title;
         this.icon = icon;
         this.actionType = actionType;
         this.actionData = actionData;
         this.color = color;
+        this.isLongPressEnabled = isLongPressEnabled;
     }
 
     // Getters and Setters
@@ -38,4 +45,7 @@ public class ShortcutButton implements Serializable {
 
     public String getActionData() { return actionData; }
     public void setActionData(String actionData) { this.actionData = actionData; }
+
+    public boolean isLongPressEnabled() { return isLongPressEnabled; }
+    public void setLongPressEnabled(boolean isLongPressEnabled) { this.isLongPressEnabled = isLongPressEnabled; }
 }

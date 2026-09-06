@@ -1761,6 +1761,9 @@ public class SecondFragment extends Fragment implements NetworkClient.NetworkLis
 
     private boolean isActionRepeatable(ShortcutButton btn) {
         if (btn == null) return false;
+        if (btn.isLongPressEnabled()) {
+            return true;
+        }
         String type = btn.getActionType();
         String data = btn.getActionData();
         if ("System".equalsIgnoreCase(type) && data != null) {

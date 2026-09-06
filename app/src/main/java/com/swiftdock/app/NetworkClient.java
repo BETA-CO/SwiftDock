@@ -750,6 +750,7 @@ public class NetworkClient {
                         btn.setIcon(btnObj.optString("Icon", "default"));
                         btn.setActionType(btnObj.optString("ActionType", ""));
                         btn.setActionData(btnObj.optString("ActionData", ""));
+                        btn.setLongPressEnabled(btnObj.optBoolean("IsLongPressEnabled", btnObj.optBoolean("isLongPressEnabled", false)));
                         syncedButtons.add(btn);
                     }
                 }
